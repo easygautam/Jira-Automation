@@ -67,6 +67,7 @@ teamPrefixMapping:
 timeline:
   hoursPerDay: 6
   leaveTaskPrefixes:
+    generic: "Leave |"
     planned: "Leave | Planned"
     unplanned: "Leave | Unplanned"
   sideDisplay:
@@ -74,7 +75,6 @@ timeline:
     frontend: Web
     mobile: Mobile
     qa: QA
-    release: Release
     other: Other
     unknown: Other
   # Task/Sub-task with recognized pipe prefix but no keyword rule → canonical row
@@ -83,7 +83,7 @@ timeline:
     frontend: Web development
     mobile: Mobile development
   canonicalTasks:
-    - { name: PRD Tech Discussion, side: Release }
+    - { name: PRD Tech Discussion }
     - { name: BE Assessment, side: Backend }
     - { name: Web Assessment, side: Web }
     - { name: Mobile Assessment, side: Mobile }
@@ -101,12 +101,12 @@ timeline:
     - { name: QA web pre-prod, side: Web }
     - { name: QA mobile pre-prod, side: Mobile }
     - { name: UAT final, side: QA }
-    - { name: Ready for release, side: Release }
-    - { name: Go live date, side: Release }
+    - { name: Ready for release }
+    - { name: Go live date }
   mappingRules:
     - { keywords: ["leave | planned"], task: null, leaveType: planned }
     - { keywords: ["leave | unplanned"], task: null, leaveType: unplanned }
-    - { keywords: ["prd handover"], ["prd tech", "tech discussion"], task: PRD Tech Discussion }
+    - { keywords: ["prd handover", "prd tech", "tech discussion"], task: PRD Tech Discussion }
     - { keywords: ["be assessment", "backend assessment"], task: BE Assessment }
     - { keywords: ["web assessment", "frontend assessment"], task: Web Assessment }
     - { keywords: ["mobile assessment", "app assessment", "android assessment"], task: Mobile Assessment }
@@ -116,7 +116,7 @@ timeline:
     - { keywords: ["qa mobile stage", "qa app stage"], task: QA mobile stage + Admin + Bug fixes }
     - { keywords: ["qa web pre-prod", "web pre-prod", "qa pre-prod"], task: QA web pre-prod }
     - { keywords: ["qa mobile pre-prod", "mobile pre-prod"], task: QA mobile pre-prod }
-    - { keywords: ["uat final"], ["uat prod"] task: UAT final }
+    - { keywords: ["uat final", "uat prod"], task: UAT final }
     - { keywords: ["uat stage", "uat"], task: UAT stage }
     - { keywords: ["ready for release"], task: Ready for release }
     - { keywords: ["go live"], task: Go live date }

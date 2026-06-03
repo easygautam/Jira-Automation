@@ -71,13 +71,12 @@ MINIMAL_CONFIG = {
             "frontend": "Web",
             "mobile": "Mobile",
             "qa": "QA",
-            "release": "Release",
             "unknown": "Other",
         },
         "canonicalTasks": [
             {"name": "BE development", "side": "Backend"},
             {"name": "Web development", "side": "Web"},
-            {"name": "Go live date", "side": "Release"},
+            {"name": "Go live date"},
         ],
         "mappingRules": [
             {"keywords": ["leave | planned"], "leaveType": "planned"},
@@ -107,6 +106,25 @@ class TestClassifyIssue(unittest.TestCase):
         result = classify_issue(issue, cfg, MINIMAL_CONFIG["teams"])
         self.assertEqual(result["kind"], "leave")
         self.assertEqual(result["leaveType"], "planned")
+
+    def test_generic_leave_health_issue(self):
+        epic = _epic("VP-100")
+        work = _issue("VP-2", "QA | WEB | stage work", 3600, parent_key="VP-100", assignee="Shivam")
+        leave = _issue(
+            "VP-3",
+            "Leave | Health Issue",
+            21600,
+            parent_key="VP-100",
+            assignee="Shivam",
+        )
+        cfg = MINIMAL_CONFIG["timeline"]
+        result = classify_issue(
+            leave, cfg, MINIMAL_CONFIG["teams"], epic_issues=[epic, work, leave]
+        )
+        self.assertEqual(result["kind"], "leave")
+        self.assertEqual(result["leaveType"], "planned")
+        self.assertEqual(result["team"], "qa")
+        self.assertEqual(result["comment"], "Health Issue")
 
     def test_be_development_keyword(self):
         issue = _issue("VP-2", "BE || Add endpoint", 14400)
@@ -169,6 +187,54 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         self.assertEqual(by_name["Alice"]["start"], "2026-06-01")
         self.assertEqual(by_name["Bob"]["end"], "2026-06-05")
         self.assertEqual(len(result[0]["teamSummary"]["Backend"]["members"]), 2)
+
+    def test_leave_health_issue_in_teams_plan(self):
+        epic = _epic("VP-500")
+        work = _issue(
+            "VP-501",
+            "QA | WEB | EVENTS PRD",
+            14400,
+            parent_key="VP-500",
+            assignee="Shivam",
+        )
+        leave = _issue(
+            "VP-502",
+            "Leave | Health Issue",
+            21600,
+            parent_key="VP-500",
+            assignee="Shivam",
+        )
+        schedule = {
+            "scheduled": [
+                {"key": "VP-501", "startDate": "2026-06-01", "dueDate": "2026-06-04"},
+                {"key": "VP-502", "startDate": "2026-06-08", "dueDate": "2026-06-08"},
+            ]
+        }
+        result = build_timeline_breakdown(
+            [epic, work, leave], schedule, MINIMAL_CONFIG
+        )[0]
+        self.assertEqual(result["unmapped"], [])
+        qa = result["teamSummary"]["QA"]
+        self.assertEqual(qa["totalLeaveHours"], 6.0)
+        shivam = next(m for m in result["membersBySide"]["QA"] if m["member"] == "Shivam")
+        self.assertEqual(shivam["plannedLeaveHours"], 6.0)
+        self.assertIn("VP-502", shivam["issueKeys"])
+
+    def test_no_release_in_teams_plan(self):
+        epic = _epic("VP-400")
+        t1 = _issue("VP-401", "BE || API", 3600, parent_key="VP-400")
+        schedule = {"scheduled": []}
+        cfg = dict(MINIMAL_CONFIG)
+        cfg["timeline"] = dict(MINIMAL_CONFIG["timeline"])
+        cfg["timeline"]["canonicalTasks"] = [
+            {"name": "PRD Tech Discussion"},
+            {"name": "BE development", "side": "Backend"},
+            {"name": "Go live date"},
+        ]
+        result = build_timeline_breakdown([epic, t1], schedule, cfg)
+        self.assertNotIn("Release", result[0]["teamSummary"])
+        prd = next(r for r in result[0]["tasks"] if r["task"] == "PRD Tech Discussion")
+        self.assertIsNone(prd["team"])
 
 
 if __name__ == "__main__":

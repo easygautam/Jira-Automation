@@ -18,11 +18,15 @@ except ImportError:
     yaml = None  # type: ignore
 
 from jira_teams import (
+    TEAM_OTHER,
     mapping_rule_applies,
     qa_work_stream,
     task_from_pipe_prefix_team,
     team_from_issue,
 )
+
+# Engineering teams only — milestone rows (no side) stay in Task breakdown, not Teams plan.
+TEAM_PLAN_SIDES = ("Backend", "Web", "Mobile", "QA", "Other")
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -61,6 +65,18 @@ def side_display(team: str, side_display: dict[str, str]) -> str:
     if team in ("other", "unknown"):
         return side_display.get("other") or side_display.get("unknown", "Other")
     return side_display.get(team, side_display.get("other", "Other"))
+
+
+def canonical_side(
+    ct: dict[str, Any], side_display_map: dict[str, str]
+) -> str | None:
+    """Team for canonical row; None = milestone (excluded from Teams plan)."""
+    raw = ct.get("side")
+    if raw is None or raw == "" or str(raw).lower() == "release":
+        return None
+    if raw in TEAM_PLAN_SIDES:
+        return raw
+    return side_display(str(raw).lower(), side_display_map)
 
 
 def resolve_epic_key(issue: dict[str, Any], index: dict[str, dict[str, Any]]) -> str | None:
@@ -194,38 +210,67 @@ def calc_days(
     return math.ceil(total / (resources * hours_per_day))
 
 
+def resolve_leave_team(
+    issue: dict[str, Any],
+    epic_issues: list[dict[str, Any]],
+    teams_cfg: dict[str, list[str]],
+    config: dict[str, Any] | None,
+) -> str:
+    """Leave | * titles use assignee's delivery team from other work on the same epic."""
+    team = team_from_issue(issue, teams_cfg, config)
+    if team != TEAM_OTHER:
+        return team
+    member = assignee_name(issue)
+    if member == "Unassigned":
+        return team
+    for other in epic_issues:
+        if other.get("key") == issue.get("key"):
+            continue
+        if is_bug_issue(other) or not is_task_or_subtask(other):
+            continue
+        if assignee_name(other) != member:
+            continue
+        other_team = team_from_issue(other, teams_cfg, config)
+        if other_team != TEAM_OTHER:
+            return other_team
+    return team
+
+
 def classify_issue(
     issue: dict[str, Any],
     timeline_cfg: dict[str, Any],
     teams_cfg: dict[str, list[str]],
     config: dict[str, Any] | None = None,
+    epic_issues: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     summary = (get_field(issue, "summary") or "").strip()
     lower = summary.lower()
     prefixes = timeline_cfg.get("leaveTaskPrefixes") or {}
     planned_p = (prefixes.get("planned") or "Leave | Planned").lower()
     unplanned_p = (prefixes.get("unplanned") or "Leave | Unplanned").lower()
+    generic_p = (prefixes.get("generic") or "Leave |").lower()
+
+    def _leave_result(leave_type: str, prefix_key: str, prefix_len: int) -> dict[str, Any]:
+        team = resolve_leave_team(
+            issue, epic_issues or [], teams_cfg, config
+        )
+        comment = summary[prefix_len:].strip(" -:")
+        return {
+            "kind": "leave",
+            "leaveType": leave_type,
+            "team": team,
+            "comment": comment,
+            "task": None,
+        }
 
     if lower.startswith(planned_p):
-        team = team_from_issue(issue, teams_cfg, config)
-        comment = summary[len(prefixes.get("planned", "")) :].strip(" -:")
-        return {
-            "kind": "leave",
-            "leaveType": "planned",
-            "team": team,
-            "comment": comment,
-            "task": None,
-        }
+        return _leave_result("planned", "planned", len(prefixes.get("planned") or "Leave | Planned"))
     if lower.startswith(unplanned_p):
-        team = team_from_issue(issue, teams_cfg, config)
-        comment = summary[len(prefixes.get("unplanned", "")) :].strip(" -:")
-        return {
-            "kind": "leave",
-            "leaveType": "unplanned",
-            "team": team,
-            "comment": comment,
-            "task": None,
-        }
+        return _leave_result(
+            "unplanned", "unplanned", len(prefixes.get("unplanned") or "Leave | Unplanned")
+        )
+    if lower.startswith(generic_p):
+        return _leave_result("planned", "generic", len(prefixes.get("generic") or "Leave |"))
 
     team = team_from_issue(issue, teams_cfg, config)
     itype = issue_type_name(issue)
@@ -336,9 +381,7 @@ def build_timeline_breakdown(
         buckets: dict[str, dict[str, Any]] = {}
         for ct in canonical_tasks:
             name = ct["name"]
-            side = ct.get("side", "Release")
-            if side not in ("Backend", "Web", "Mobile", "QA", "Release"):
-                side = side_display(str(side).lower(), side_display_map)
+            side = canonical_side(ct, side_display_map)
             buckets[name] = {
                 "task": name,
                 "team": side,
@@ -368,7 +411,9 @@ def build_timeline_breakdown(
                 continue
             key = issue.get("key")
             est_h = int(get_field(issue, "timeoriginalestimate") or 0) / 3600.0
-            classification = classify_issue(issue, timeline_cfg, teams_cfg, config)
+            classification = classify_issue(
+                issue, timeline_cfg, teams_cfg, config, epic_issues=epic_issues
+            )
 
             member = assignee_name(issue)
             sch = scheduled_by_key.get(key)
@@ -448,7 +493,11 @@ def build_timeline_breakdown(
 
         # Distribute leave hours to rows on matching side (fallback: highest-effort row on epic)
         for side_name, amounts in leave_by_side.items():
-            side_rows = [n for n, b in buckets.items() if b["team"] == side_name and b["effortsHours"] > 0]
+            side_rows = [
+                n
+                for n, b in buckets.items()
+                if b["team"] == side_name and b["effortsHours"] > 0
+            ]
             if not side_rows:
                 side_rows = [n for n, b in buckets.items() if b["team"] == side_name]
             if not side_rows:
@@ -503,7 +552,7 @@ def build_timeline_breakdown(
         members_by_side = build_members_by_side(member_stats, hours_per_day)
 
         team_summary: dict[str, Any] = {}
-        for side in ("Backend", "Web", "Mobile", "QA", "Release", "Other"):
+        for side in TEAM_PLAN_SIDES:
             members = members_by_side.get(side, [])
             rows = [r for r in task_rows if r["team"] == side]
             if not rows and not members:

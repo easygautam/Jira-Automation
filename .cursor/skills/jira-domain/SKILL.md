@@ -40,7 +40,7 @@ project = {projectKey} AND sprint in openSprints() AND timeoriginalestimate is E
 
 ## Leave tasks (timeline)
 
-Summaries starting with `Leave | Planned` / `Leave | Unplanned` (see `timeline.leaveTaskPrefixes`) → planned leave / unplanned delay columns in timeline breakdown.
+Leave tasks: summary starts with `Leave |` (see `timeline.leaveTaskPrefixes`). `Leave | Planned` → planned leave; `Leave | Unplanned` → unplanned delay; other `Leave | <reason>` (e.g. `Leave | Health Issue`) → planned leave. Team comes from assignee’s other tasks on the same epic when the title has no BE/QA/WEB prefix.
 
 ## Team from summary
 

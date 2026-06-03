@@ -166,17 +166,22 @@ def render_timeline_sections(
             f"- Delivery window: {d_start} → {d_end} | Go live: {go_live}{cal_s}"
         )
         lines.append("")
-        lines.append("#### Members by side")
+        lines.append("#### Teams plan")
         lines.append("")
         lines.append(
-            "| Side | Peak resources | Total effort (h) | Planned leave (h) | "
+            "| Team | Peak resources | Total effort (h) | Planned leave (h) | "
             "Unplanned delay (h) | Tasks |"
         )
         lines.append(
-            "|------|------------------|------------------|-------------------|"
+            "|------|----------------|------------------|-------------------|"
             "---------------------|-------|"
         )
-        for side, summary in sorted((epic.get("teamSummary") or {}).items()):
+        team_order = ("Backend", "Web", "Mobile", "QA", "Other")
+        summary_by_side = epic.get("teamSummary") or {}
+        for side in team_order:
+            summary = summary_by_side.get(side)
+            if not summary:
+                continue
             lines.append(
                 f"| {side} | {_fmt_resources(summary.get('peakResources'))} | "
                 f"{_fmt_hours(summary.get('totalEffortHours'))} | "
@@ -185,7 +190,9 @@ def render_timeline_sections(
                 f"{summary.get('taskCount', 0)} |"
             )
         members_by_side = epic.get("membersBySide") or {}
-        for side in sorted(members_by_side.keys()):
+        for side in team_order:
+            if side not in members_by_side:
+                continue
             members = members_by_side[side]
             if not members:
                 continue
@@ -230,7 +237,7 @@ def render_timeline_sections(
             calc = row.get("calculatedDays")
             calc_s = str(calc) if calc is not None else "—"
             lines.append(
-                f"| {escape_md_cell(row.get('task', ''))} | {row.get('team', '')} | "
+                f"| {escape_md_cell(row.get('task', ''))} | {row.get('team') or '—'} | "
                 f"{_fmt_resources(row.get('resources'))} | "
                 f"{_fmt_hours(row.get('effortsHours'))} | "
                 f"{_fmt_hours(row.get('plannedLeaveHours'))} | "

@@ -30,4 +30,4 @@ Team prefixes: `scripts/jira_teams.py` + `em-config.yaml` `teamPrefixMapping` (f
 
 ## Report sections (order)
 
-Executive summary → Delivery items (Epics) → Timeline breakdown → Bug fix effort → Schedule by assignee → Data quality (+ Schedule Delta on recalc).
+Executive summary → Delivery items (Epics) → Timeline breakdown (**Teams plan** = Backend/Web/Mobile/QA only; milestones in Task breakdown) → Bug fix effort → Schedule by assignee → Data quality (+ Schedule Delta on recalc).
