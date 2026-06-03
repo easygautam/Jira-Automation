@@ -59,7 +59,6 @@ Sprint dates come from `sprint-meta.json` (Jira active sprint field). Manual `--
   "sprintEnd": "YYYY-MM-DD",
   "hoursPerDay": 8,
   "workingDays": [0, 1, 2, 3, 4],
-  "integrationBufferPercent": 10,
   "today": "YYYY-MM-DD",
   "items": [
     {
@@ -102,6 +101,8 @@ Sprint dates come from `sprint-meta.json` (Jira active sprint field). Manual `--
   "unscheduled": [{ "key": "PROJ-99", "reason": "missing_estimate" }]
 }
 ```
+
+`violations` is always empty: unscheduled dependencies are not flagged. BE→Mobile/Web start order applies only when the dependency task is already scheduled.
 
 Duration, dependencies, and status rules: `.cursor/rules/schedule-engine.mdc` and `scripts/schedule_engine.py`.
 

@@ -13,7 +13,7 @@ Canonical inventory for agents. **Runbook:** `.cursor/skills/em-orchestrator/SKI
 | Schedule (8h) | `schedule_engine.py` | `scripts/.tmp/schedule.json` |
 | Timeline (6h, Task/Sub-task) | `timeline_breakdown.py` | `scripts/.tmp/timeline-breakdown.json` |
 | Bug effort | `bug_effort_breakdown.py` | `scripts/.tmp/bug-effort-breakdown.json` |
-| Report | `render_report.py` | `reports/sprint-{date}.md` |
+| Report | `render_report.py` (+ `data_quality.py` flags) | `reports/sprint-{date}.md` |
 
 Team prefixes: `scripts/jira_teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment only; else **Other**). Details: `jira-domain` skill.
 
@@ -30,4 +30,4 @@ Team prefixes: `scripts/jira_teams.py` + `em-config.yaml` `teamPrefixMapping` (f
 
 ## Report sections (order)
 
-Executive summary → Delivery items (Epics) → Timeline breakdown (**Teams plan** = Backend/Web/Mobile/QA only; milestones in Task breakdown) → Bug fix effort → Schedule by assignee → Data quality (+ Schedule Delta on recalc).
+Executive summary → Delivery items (Epics) → Timeline breakdown (**Teams plan** = Backend/Web/Mobile/QA only; milestones in Task breakdown) → Bug fix effort (epic × Backend/Web/Mobile table + member detail) → Team tasks plan (per-member scheduled tasks) → Data quality (+ Schedule Delta on recalc).

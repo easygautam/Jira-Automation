@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate Bug issue effort per epic and member."""
+"""Aggregate Bug issue effort per epic and member (totals only, no issue lists)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from jira_normalize import time_spent_seconds
 from timeline_breakdown import (
     assignee_name,
     epic_summary,
@@ -23,6 +24,20 @@ from timeline_breakdown import (
 from jira_teams import team_from_issue
 
 
+def collect_sprint_epic_keys(
+    issues: list[dict[str, Any]],
+    schedule: dict[str, Any],
+) -> list[str]:
+    """Epic keys in sprint scope (same set as Delivery items table)."""
+    keys: set[str] = {i["key"] for i in issues if is_epic_issue(i)}
+    for bucket in ("scheduled", "unscheduled"):
+        for row in schedule.get(bucket) or []:
+            ek = row.get("epicKey")
+            if ek:
+                keys.add(ek)
+    return sorted(keys)
+
+
 def build_bug_effort_breakdown(
     issues: list[dict[str, Any]],
     schedule: dict[str, Any],
@@ -32,83 +47,66 @@ def build_bug_effort_breakdown(
     side_display_map = (config.get("timeline") or {}).get("sideDisplay") or {}
 
     index = {i["key"]: i for i in issues if i.get("key")}
-    scheduled_by_key = {r["key"]: r for r in schedule.get("scheduled", [])}
-
-    epic_keys: set[str] = set()
-    for issue in issues:
-        if is_epic_issue(issue):
-            epic_keys.add(issue["key"])
-        ek = resolve_epic_key(issue, index)
-        if ek:
-            epic_keys.add(ek)
+    epic_keys = collect_sprint_epic_keys(issues, schedule)
 
     results: list[dict[str, Any]] = []
 
-    for epic_key in sorted(epic_keys):
+    for epic_key in epic_keys:
         epic_bugs = [
             i
             for i in issues
             if is_bug_issue(i)
             and (i.get("key") == epic_key or resolve_epic_key(i, index) == epic_key)
         ]
-        if not epic_bugs:
-            continue
 
         member_rows: dict[str, dict[str, Any]] = {}
 
         for issue in epic_bugs:
-            key = issue.get("key")
-            est_h = int(get_field(issue, "timeoriginalestimate") or 0) / 3600.0
+            est_h = time_spent_seconds(issue, config) / 3600.0
             member = assignee_name(issue)
             team = team_from_issue(issue, teams_cfg, config)
             side = side_display(team, side_display_map)
-            sch = scheduled_by_key.get(key)
             if member not in member_rows:
                 member_rows[member] = {
                     "member": member,
                     "effortsHours": 0.0,
-                    "issues": [],
+                    "bugCount": 0,
                     "sides": set(),
                 }
             row = member_rows[member]
             row["effortsHours"] += est_h
+            row["bugCount"] += 1
             row["sides"].add(side)
-            row["issues"].append(
-                {
-                    "key": key,
-                    "summary": (get_field(issue, "summary") or "")[:100],
-                    "side": side,
-                    "effortsHours": round(est_h, 1) if est_h else None,
-                    "start": sch["startDate"] if sch else None,
-                    "end": sch["dueDate"] if sch else None,
-                    "status": (get_field(issue, "status") or {}).get("name"),
-                }
+
+        members: list[dict[str, Any]] = []
+        by_side: dict[str, dict[str, Any]] = {}
+        total = None
+
+        if epic_bugs:
+            members = sorted(
+                member_rows.values(),
+                key=lambda m: (m["effortsHours"], m["member"]),
+                reverse=True,
             )
+            for m in members:
+                m["effortsHours"] = round(m["effortsHours"], 1) if m["effortsHours"] else None
+                sides = m.pop("sides", set())
+                m["sides"] = sorted(sides)
+                m["side"] = ", ".join(m["sides"]) if sides else "Other"
 
-        members = sorted(
-            member_rows.values(),
-            key=lambda m: (m["effortsHours"], m["member"]),
-            reverse=True,
-        )
-        for m in members:
-            m["effortsHours"] = round(m["effortsHours"], 1) if m["effortsHours"] else None
-            m["issueCount"] = len(m["issues"])
-            sides = m.pop("sides", set())
-            m["sides"] = sorted(sides)
-            m["side"] = ", ".join(m["sides"]) if sides else "Other"
-
-        by_side: dict[str, dict[str, Any]] = defaultdict(
-            lambda: {"totalEffortHours": 0.0, "members": []}
-        )
-        for m in members:
-            side = m["side"]
-            by_side[side]["totalEffortHours"] += m.get("effortsHours") or 0
-            by_side[side]["members"].append(m["member"])
-        for side, data in by_side.items():
-            data["totalEffortHours"] = round(data["totalEffortHours"], 1) or None
-            data["memberCount"] = len(data["members"])
-
-        total = round(sum(m.get("effortsHours") or 0 for m in members), 1)
+            by_side_acc: dict[str, dict[str, Any]] = defaultdict(
+                lambda: {"totalEffortHours": 0.0, "bugCount": 0, "members": []}
+            )
+            for m in members:
+                side = m["side"]
+                by_side_acc[side]["totalEffortHours"] += m.get("effortsHours") or 0
+                by_side_acc[side]["bugCount"] += m["bugCount"]
+                by_side_acc[side]["members"].append(m["member"])
+            for side, data in by_side_acc.items():
+                data["totalEffortHours"] = round(data["totalEffortHours"], 1) or None
+                data["memberCount"] = len(data["members"])
+            by_side = dict(by_side_acc)
+            total = round(sum(m.get("effortsHours") or 0 for m in members), 1) or None
 
         results.append(
             {

@@ -40,14 +40,13 @@ All teams (Backend, Mobile, Web, QA) understand the requirement and do tech solu
 | Dependency | Scheduling rule |
 |------------|-----------------|
 | Backend provides API contracts | Mobile and Web use contracts during development |
-| Backend delivers APIs | Mobile/Web need **10% bandwidth** after BE delivery to test implemented APIs |
+| Backend delivers APIs | Mobile/Web start after BE due date (schedule engine) |
 | Backend provides API contracts | QA writes automation |
 | Backend delivers APIs | QA validates API once backend delivers |
 
 Engine implementation (`scripts/schedule_engine.py`):
 
 - Items with `team` = mobile or frontend: `start ≥` linked BE story/item due date for same epic
-- After BE due: add `integrationBufferPercent` (default 10%) of Mobile/Web estimate as extra duration tail
 - Items with `team` = qa and dependency type API validation: start ≥ BE due date for same epic
 
 Pass dependencies in normalized JSON as:
@@ -56,11 +55,11 @@ Pass dependencies in normalized JSON as:
 { "type": "backend_delivery", "dependsOnKey": "PROJ-50", "epicKey": "PROJ-1" }
 ```
 
+If the dependency task is not scheduled (e.g. missing estimate), the engine does **not** flag a violation and does not delay the dependent task.
+
 ## Phase snapshot (for reports)
 
 For each Epic, derive current phase from highest child status in pipeline order, or epic status if no children.
-
-Report blockers when phase cannot advance (e.g. QA blocked waiting on BE delivery past due date).
 
 ## Timeline breakdown rows (sprint report)
 

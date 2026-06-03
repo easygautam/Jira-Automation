@@ -14,11 +14,10 @@ Do not recalculate dates in prose; run `scripts/schedule_engine.py`.
 | Duration | `ceil(estimateSeconds / (hoursPerDay * 3600))`, min 1 if estimate > 0 |
 | Priority sort | Epic priority → story rank → created date |
 | Task priority | Inherit from parent Epic |
-| Integration buffer | 10% of Mobile/Web effort after BE delivery |
 | BE → Mobile/Web | Mobile/Web start ≥ BE due date |
 | BE → QA API work | QA API validation start ≥ BE due date |
 
-Effort source: sum `timeoriginalestimate` on Tasks/Sub-tasks per Story, assignee-wise.
+Effort source: sum `timeoriginalestimate` on Tasks/Sub-tasks per Story, assignee-wise. **Bug** issues use `timespent` when Original Estimate is empty (see `effective_estimate_seconds` in `jira_normalize.py`).
 
 Status classification (post-engine):
 

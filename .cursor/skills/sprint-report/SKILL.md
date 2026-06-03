@@ -16,10 +16,20 @@ disable-model-invocation: true
 
 Report shape and sections are produced by `scripts/render_report.py` (not hand-authored markdown). Status rules: `.cursor/rules/schedule-engine.mdc`.
 
+## Bug fix effort
+
+- Summary table: all sprint epics — Epic ID, Epic Name, Backend, Web, Mobile, Bugs (worklog hours; — when none)
+- Per-epic member tables: Member, Bug effort (h), Bug count (no team column)
+
+## Team tasks plan
+
+- Per-assignee scheduled task tables (Key, Task title, Epic, Effort, Status); replaces former Schedule by assignee index
+
 ## Epic rollup (delivery items)
 
 - **Start** = earliest child task `startDate`; **Due** = latest child `dueDate`
 - **Status** = worst child (blocked > delayed > at_risk > on_track); **TBD** if unscheduled
+- **Title** links to that epic's PRD block in Timeline breakdown (`#prd-{epicKey}`) when timeline data exists
 
 ## Standup mode (`/daily-standup`)
 

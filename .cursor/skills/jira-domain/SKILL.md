@@ -18,6 +18,7 @@ Epic (priority source) → Story → Task / Sub-task (estimate + assignee). Walk
 | Epic | Delivery item (PRD) |
 | Story | Independently releasable slice |
 | Task / Sub-task | Execution; estimates on `timeoriginalestimate`, summed per assignee per story |
+| Bug | Schedulable via `effective_estimate_seconds` (`timespent` if &gt; 0, else OE); **Bug fix effort** report uses `timespent` only; no “missing estimate” DQ flag when time is logged |
 
 Task effective priority = Epic priority (`priorityOrder` in config). Flag missing estimates before scheduling.
 
@@ -35,7 +36,7 @@ project = {projectKey} AND sprint in openSprints() AND timeoriginalestimate is E
 1. `getAccessibleAtlassianResources` if `cloudId` empty
 2. Discover Sprint field via `getJiraIssueTypeMetaWithFields` if needed → `fields.sprint` in config
 3. `searchJiraIssuesUsingJql` paginated (`maxResults=100`, `nextPageToken`)
-4. Fields: `summary, status, assignee, priority, issuetype, parent, timeoriginalestimate, created, updated, resolutiondate, labels, components, {fields.sprint}`
+4. Fields: `summary, status, assignee, priority, issuetype, parent, timeoriginalestimate, timespent, created, updated, resolutiondate, labels, components, {fields.sprint}` (see `fields.timeSpent` in config)
 5. Write `scripts/.tmp/issues.json` → `sprint_meta.py` → `sprint-meta.json` (do not infer sprint dates)
 
 ## Leave tasks (timeline)

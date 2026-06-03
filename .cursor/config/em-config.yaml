@@ -12,6 +12,7 @@ jira:
 
 fields:
   originalEstimate: timeoriginalestimate
+  timeSpent: timespent           # Bug effort fallback when Original Estimate is empty
   sprint: customfield_10020      # Jira Cloud default; overwritten after auto-discovery
 
 scheduling:
@@ -20,7 +21,6 @@ scheduling:
   # Python engine uses weekday ints: Mon=0 .. Sun=6
   workingDayInts: [0, 1, 2, 3, 4]
   timezone: Asia/Kolkata
-  integrationBufferPercent: 10
 
 teams:
   backend: [backend, be, api]

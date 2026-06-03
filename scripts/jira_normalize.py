@@ -63,9 +63,40 @@ def assignee_id(issue: dict[str, Any]) -> str:
     return a.get("accountId") or a.get("displayName") or "unassigned"
 
 
-def estimate_seconds(issue: dict[str, Any]) -> int:
-    val = get_field(issue, "timeoriginalestimate")
-    return int(val or 0)
+def is_bug_issue(issue: dict[str, Any]) -> bool:
+    return issue_type_name(issue) == "bug"
+
+
+def estimate_seconds(issue: dict[str, Any], config: dict[str, Any] | None = None) -> int:
+    """Original Estimate only (legacy name). Prefer effective_estimate_seconds."""
+    fields_cfg = (config or {}).get("fields") or {}
+    oe_field = fields_cfg.get("originalEstimate", "timeoriginalestimate")
+    return int(get_field(issue, oe_field) or 0)
+
+
+def time_spent_seconds(issue: dict[str, Any], config: dict[str, Any] | None = None) -> int:
+    fields_cfg = (config or {}).get("fields") or {}
+    ts_field = fields_cfg.get("timeSpent", "timespent")
+    return int(get_field(issue, ts_field) or 0)
+
+
+def effective_estimate_seconds(
+    issue: dict[str, Any], config: dict[str, Any] | None = None
+) -> int:
+    """
+    Task/Sub-task/Test Execution: Original Estimate only.
+    Bug: time spent (worklog total) if > 0, else Original Estimate.
+    """
+    oe = estimate_seconds(issue, config)
+    if is_bug_issue(issue):
+        spent = time_spent_seconds(issue, config)
+        return spent if spent > 0 else oe
+    return oe
+
+
+def has_actionable_bug_effort(issue: dict[str, Any], config: dict[str, Any] | None = None) -> bool:
+    """True when a Bug has time spent and should not be flagged as missing estimate."""
+    return is_bug_issue(issue) and time_spent_seconds(issue, config) > 0
 
 
 def is_blocked(issue: dict[str, Any]) -> bool:
@@ -205,7 +236,7 @@ def normalize(
                 "storyKey": story_key,
                 "epicKey": epic_key,
                 "assignee": assignee_id(issue),
-                "estimateSeconds": estimate_seconds(issue),
+                "estimateSeconds": effective_estimate_seconds(issue, config),
                 "epicPriorityRank": priority_rank(epic_priority, priority_order),
                 "storyRank": story_ranks.get(story_key or "", 999),
                 "team": team,
@@ -220,7 +251,6 @@ def normalize(
         "sprintEnd": sprint_end,
         "hoursPerDay": scheduling.get("hoursPerDay", 8),
         "workingDays": scheduling.get("workingDayInts", [0, 1, 2, 3, 4]),
-        "integrationBufferPercent": scheduling.get("integrationBufferPercent", 10),
         "today": today or date.today().isoformat(),
         "items": items,
     }

@@ -45,7 +45,6 @@ class TestSequentialSchedule(unittest.TestCase):
             "sprintEnd": "2026-06-13",
             "hoursPerDay": 8,
             "workingDays": [0, 1, 2, 3, 4],
-            "integrationBufferPercent": 0,
             "today": "2026-06-02",
             "items": [
                 {
@@ -89,7 +88,6 @@ class TestPriorityReorder(unittest.TestCase):
             "sprintEnd": "2026-06-13",
             "hoursPerDay": 8,
             "workingDays": [0, 1, 2, 3, 4],
-            "integrationBufferPercent": 0,
             "today": "2026-06-02",
         }
         items_low_first = {
@@ -155,7 +153,6 @@ class TestBackendDependency(unittest.TestCase):
             "sprintEnd": "2026-06-20",
             "hoursPerDay": 8,
             "workingDays": [0, 1, 2, 3, 4],
-            "integrationBufferPercent": 0,
             "today": "2026-06-02",
             "items": [
                 {
@@ -184,6 +181,32 @@ class TestBackendDependency(unittest.TestCase):
         be = next(x for x in result["scheduled"] if x["key"] == "BE-1")
         mob = next(x for x in result["scheduled"] if x["key"] == "MOB-1")
         self.assertGreaterEqual(parse_date(mob["startDate"]), parse_date(be["dueDate"]))
+
+    def test_unscheduled_dependency_no_violation(self):
+        data = {
+            "sprintStart": "2026-06-02",
+            "sprintEnd": "2026-06-20",
+            "hoursPerDay": 8,
+            "workingDays": [0, 1, 2, 3, 4],
+            "today": "2026-06-02",
+            "items": [
+                {
+                    "key": "MOB-1",
+                    "assignee": "mob",
+                    "estimateSeconds": 8 * 3600,
+                    "epicPriorityRank": 1,
+                    "storyRank": 1,
+                    "team": "mobile",
+                    "created": "2026-06-01",
+                    "dependencies": [
+                        {"type": "backend_delivery", "dependsOnKey": "BE-MISSING"}
+                    ],
+                },
+            ],
+        }
+        result = compute_schedule(data)
+        self.assertEqual(result["violations"], [])
+        self.assertEqual(len(result["scheduled"]), 1)
 
 
 if __name__ == "__main__":

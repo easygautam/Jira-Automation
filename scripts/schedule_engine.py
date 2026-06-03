@@ -94,7 +94,6 @@ def compute_schedule(data: dict[str, Any]) -> dict[str, Any]:
     sprint_end = parse_date(data["sprintEnd"])
     today = parse_date(data.get("today", date.today().isoformat()))
     hours_per_day = int(data.get("hoursPerDay", 8))
-    buffer_pct = float(data.get("integrationBufferPercent", 10))
     working_days = set(data.get("workingDays", [0, 1, 2, 3, 4]))
     items: list[dict[str, Any]] = data.get("items", [])
 
@@ -114,16 +113,12 @@ def compute_schedule(data: dict[str, Any]) -> dict[str, Any]:
         for item in queue:
             est = int(item.get("estimateSeconds") or 0)
             blocked = bool(item.get("blocked", False))
-            team = (item.get("team") or "").lower()
 
             if est <= 0 and not blocked:
                 unscheduled.append({"key": item["key"], "reason": "missing_estimate"})
                 continue
 
             dur = duration_days(est, hours_per_day)
-            if team in ("mobile", "frontend") and est > 0:
-                extra = math.ceil(dur * buffer_pct / 100)
-                dur += extra
 
             start = sprint_start
             if prev_end is not None:
@@ -136,13 +131,8 @@ def compute_schedule(data: dict[str, Any]) -> dict[str, Any]:
                     dep_start = next_working_day(dep_due, working_days)
                     if start < dep_start:
                         start = dep_start
-                elif dep_key:
-                    violations.append(
-                        {
-                            "key": item["key"],
-                            "issue": f"dependency {dep_key} not yet scheduled",
-                        }
-                    )
+                # If dependency is not scheduled (e.g. missing estimate), skip constraint
+                # — do not flag a violation; teams are not required to set Jira dates.
 
             if not is_working_day(start, working_days):
                 while not is_working_day(start, working_days):
@@ -150,10 +140,6 @@ def compute_schedule(data: dict[str, Any]) -> dict[str, Any]:
 
             due = add_business_days(start, dur, working_days) if dur > 0 else start
             status = classify_status(due, sprint_end, today, blocked, est > 0)
-
-            notes = []
-            if team in ("mobile", "frontend") and buffer_pct > 0:
-                notes.append(f"{buffer_pct}% integration buffer applied")
 
             entry = {
                 "key": item["key"],
@@ -164,7 +150,7 @@ def compute_schedule(data: dict[str, Any]) -> dict[str, Any]:
                 "dueDate": due.isoformat(),
                 "durationDays": dur,
                 "status": status,
-                "dependencyNotes": notes,
+                "dependencyNotes": [],
             }
             scheduled_keys[item["key"]] = entry
             prev_end = due

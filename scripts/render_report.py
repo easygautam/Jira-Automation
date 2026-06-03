@@ -9,7 +9,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from data_quality import build_data_quality_by_member
+from jira_teams import team_from_issue
+from timeline_breakdown import side_display
+
 STATUS_RANK = {"blocked": 0, "delayed": 1, "at_risk": 2, "on_track": 3, "tbd": 4}
+SCHEDULE_TEAM_ORDER = ("Backend", "Web", "Mobile", "QA", "Other")
+BUG_FIX_SIDE_COLUMNS = ("Backend", "Web", "Mobile")
 
 
 def jira_browse_url(site_url: str, issue_key: str) -> str:
@@ -117,6 +123,117 @@ def worst_status(statuses: list[str]) -> str:
     return min(statuses, key=lambda s: STATUS_RANK.get(s, 99))
 
 
+def schedule_member_anchor(display_name: str) -> str:
+    """Markdown fragment id for member detail headers (GitHub-style slug)."""
+    cleaned = "".join(
+        c if c.isalnum() or c == " " else " " for c in display_name.strip().lower()
+    )
+    return "-".join(cleaned.split()) or "member"
+
+
+def epic_prd_anchor(epic_key: str) -> str:
+    """Stable fragment id for Timeline breakdown PRD section (epic key)."""
+    return f"prd-{epic_key.lower()}"
+
+
+def epic_title_link(summary: str, epic_key: str, link_to_timeline: bool) -> str:
+    """Title cell: anchor to PRD timeline detail when breakdown exists for epic."""
+    text = escape_md_cell(summary)
+    if link_to_timeline:
+        return f"[{text}](#{epic_prd_anchor(epic_key)})"
+    return text
+
+
+def member_team_label(issue: dict, config: dict[str, Any] | None) -> str:
+    teams_cfg = (config or {}).get("teams") or {}
+    team = team_from_issue(issue, teams_cfg, config)
+    side_map = (config or {}).get("timeline", {}).get("sideDisplay") or {}
+    return side_display(team, side_map)
+
+
+def _team_index_sort_key(teams: list[str]) -> tuple[int, str]:
+    if not teams:
+        return (len(SCHEDULE_TEAM_ORDER), "Other")
+    primary = teams[0]
+    try:
+        return (SCHEDULE_TEAM_ORDER.index(primary), primary)
+    except ValueError:
+        return (len(SCHEDULE_TEAM_ORDER), primary)
+
+
+def render_team_tasks_plan(
+    by_assignee: dict[str, list],
+    assignee_names: dict[str, str],
+    issue_by_key: dict[str, dict],
+    est_by_key: dict[str, int],
+    jira_site_url: str | None,
+    config: dict[str, Any] | None,
+) -> list[str]:
+    """Per-member scheduled task tables (engine-calculated dates)."""
+    if not by_assignee:
+        return []
+
+    lines = [
+        "## Team tasks plan",
+        "",
+        "Scheduled tasks by assignee. Effort from Original Estimate "
+        "(bugs: time spent when OE empty).",
+        "",
+    ]
+
+    members: list[tuple[str, list]] = []
+    for assignee_id, rows in by_assignee.items():
+        display = assignee_names.get(assignee_id, assignee_id)
+        teams_set: set[str] = set()
+        for r in rows:
+            issue = issue_by_key.get(r["key"], {})
+            if issue:
+                teams_set.add(member_team_label(issue, config))
+        teams = sorted(teams_set, key=lambda t: _team_index_sort_key([t]))
+        members.append((display, teams, rows))
+
+    members.sort(key=lambda x: (_team_index_sort_key(x[1]), x[0].lower()))
+
+    for display, _teams, rows in members:
+        lines.append(f"### {display}")
+        lines.append("")
+        lines.append("| Key | Task title | Epic | Effort | Status |")
+        lines.append("|-----|------------|------|--------|--------|")
+        for r in rows:
+            issue = issue_by_key.get(r["key"], {})
+            title = escape_md_cell(
+                ((issue.get("fields") or {}).get("summary") or r["key"])[:80]
+            )
+            key_link = jira_issue_link(jira_site_url, r["key"])
+            epic_col = jira_issue_link(jira_site_url, r.get("epicKey"))
+            lines.append(
+                f"| {key_link} | {title} | {epic_col} "
+                f"| {format_effort(est_by_key.get(r['key']))} | {r['status']} |"
+            )
+        lines.append("")
+
+    return lines
+
+
+def _member_primary_bug_side(member: dict[str, Any]) -> str | None:
+    sides = member.get("sides") or []
+    if not sides and member.get("side"):
+        sides = [s.strip() for s in str(member.get("side", "")).split(",")]
+    for col in BUG_FIX_SIDE_COLUMNS:
+        if col in sides:
+            return col
+    return None
+
+
+def _bug_hours_by_side(epic: dict[str, Any]) -> dict[str, float]:
+    totals = {col: 0.0 for col in BUG_FIX_SIDE_COLUMNS}
+    for m in epic.get("members") or []:
+        side = _member_primary_bug_side(m)
+        if side:
+            totals[side] += m.get("effortsHours") or 0
+    return totals
+
+
 def _fmt_hours(val: float | None) -> str:
     if val is None or val == 0:
         return "—"
@@ -141,6 +258,8 @@ def render_timeline_sections(
         return []
 
     lines = [
+        '<span id="timeline-breakdown-jira"></span>',
+        "",
         "## Timeline breakdown (Jira)",
         "",
         "**Effort** includes **Task** and **Sub-task** issue types only (bugs excluded).  ",
@@ -161,6 +280,8 @@ def render_timeline_sections(
         cal_days = epic.get("calendarDeliveryDays")
         cal_s = f" | Calendar days: {cal_days}" if cal_days else ""
 
+        lines.append(f'<span id="{epic_prd_anchor(epic_key)}"></span>')
+        lines.append("")
         lines.append(f"### {epic_link} — {prd}")
         lines.append(
             f"- Delivery window: {d_start} → {d_end} | Go live: {go_live}{cal_s}"
@@ -270,13 +391,34 @@ def render_bug_sections(
     lines = [
         "## Bug fix effort",
         "",
-        "Jira **Bug** issue type only (`timeoriginalestimate`). Grouped by epic and assignee.",
+        "Jira **Bug** issues — worklog **time spent** (h) by epic and engineering side. "
+        "QA/Other effort appears in member detail only.",
         "",
+        "| Epic ID | Epic Name | Backend | Web | Mobile | Bugs |",
+        "|---------|-----------|---------|-----|--------|------|",
     ]
 
-    grand_total = sum(e.get("totalBugHours") or 0 for e in bug_data)
+    col_totals = {col: 0.0 for col in BUG_FIX_SIDE_COLUMNS}
+    for epic in bug_data:
+        epic_key = epic.get("epicKey", "")
+        prd = escape_md_cell(epic.get("prdName") or epic_key)
+        epic_id = jira_issue_link(jira_site_url, epic_key) if jira_site_url else epic_key
+        by_side = _bug_hours_by_side(epic)
+        cells = []
+        for col in BUG_FIX_SIDE_COLUMNS:
+            h = by_side[col]
+            col_totals[col] += h
+            cells.append(_fmt_hours(h) if h else "—")
+        bug_n = epic.get("bugCount", 0)
+        lines.append(f"| {epic_id} | {prd} | {' | '.join(cells)} | {bug_n} |")
+
+    lines.append("")
+    grand_total = sum(col_totals.values())
     lines.append(
-        f"**Sprint bug effort total:** {_fmt_hours(grand_total)} h across {len(bug_data)} epics"
+        f"**Sprint bug effort total:** {_fmt_hours(grand_total)} h "
+        f"(Backend {_fmt_hours(col_totals['Backend'])}, "
+        f"Web {_fmt_hours(col_totals['Web'])}, "
+        f"Mobile {_fmt_hours(col_totals['Mobile'])})"
     )
     lines.append("")
 
@@ -284,59 +426,60 @@ def render_bug_sections(
         epic_key = epic.get("epicKey", "")
         prd = escape_md_cell(epic.get("prdName") or epic_key)
         epic_link = jira_issue_link(jira_site_url, epic_key)
+        members = epic.get("members") or []
+        bug_n = epic.get("bugCount", 0)
+        if not members and bug_n == 0:
+            continue
         lines.append(f"### {epic_link} — {prd}")
-        lines.append(
-            f"- Bug issues: {epic.get('bugCount', 0)} | "
-            f"Total estimate: {_fmt_hours(epic.get('totalBugHours'))} h"
-        )
-        lines.append("")
-
-        by_side = epic.get("bySide") or {}
-        if by_side:
-            lines.append("#### By side")
+        if not members and bug_n > 0:
             lines.append("")
-            lines.append("| Side | Members | Total effort (h) |")
-            lines.append("|------|---------|------------------|")
-            for side, summary in sorted(by_side.items()):
-                members_s = ", ".join(summary.get("members") or [])
-                lines.append(
-                    f"| {escape_md_cell(side)} | {escape_md_cell(members_s)} | "
-                    f"{_fmt_hours(summary.get('totalEffortHours'))} |"
-                )
+            lines.append(f"_{bug_n} bugs in scope; no worklog time logged yet._")
             lines.append("")
-
-        lines.append("#### By member")
+            continue
         lines.append("")
-        lines.append("| Member | Side | Effort (h) | Bugs | Start | End |")
-        lines.append("|--------|------|------------|------|-------|-----|")
-        for m in epic.get("members") or []:
-            issues = m.get("issues") or []
-            starts = [i["start"] for i in issues if i.get("start")]
-            ends = [i["end"] for i in issues if i.get("end")]
-            start = min(starts) if starts else None
-            end = max(ends) if ends else None
+        lines.append("| Member | Bug effort (h) | Bug count |")
+        lines.append("|--------|----------------|-----------|")
+        for m in members:
             lines.append(
-                f"| {escape_md_cell(m.get('member', ''))} | {m.get('side', '')} | "
-                f"{_fmt_hours(m.get('effortsHours'))} | {m.get('issueCount', 0)} | "
-                f"{_fmt_date(start)} | {_fmt_date(end)} |"
+                f"| {escape_md_cell(m.get('member', ''))} | "
+                f"{_fmt_hours(m.get('effortsHours'))} | {m.get('bugCount', 0)} |"
             )
         lines.append("")
-        lines.append("#### Bug issues")
+
+    return lines
+
+
+def render_data_quality_section(
+    by_member: dict[str, list[dict[str, str]]],
+    jira_site_url: str | None,
+) -> list[str]:
+    lines = [
+        "## Data quality flags",
+        "",
+        "Issues by assignee that need cleanup before planning is reliable. "
+        "Task start/due in reports are **calculated** from estimates — not read from Jira.",
+        "",
+    ]
+    total_rows = sum(len(rows) for rows in by_member.values())
+    if total_rows == 0:
+        lines.append("No data-quality issues detected for sprint work items.")
         lines.append("")
-        for m in epic.get("members") or []:
-            lines.append(f"**{escape_md_cell(m.get('member', ''))}** ({m.get('side', '')})")
-            lines.append("")
-            for item in m.get("issues") or []:
-                key_link = jira_issue_link(jira_site_url, item.get("key"))
-                summary = escape_md_cell(item.get("summary", ""))
-                hrs = _fmt_hours(item.get("effortsHours"))
-                window = f"{_fmt_date(item.get('start'))} → {_fmt_date(item.get('end'))}"
-                status = item.get("status") or "—"
-                side = item.get("side") or "—"
-                lines.append(
-                    f"- {key_link} ({side}): {summary} — {hrs} h — {window} — {status}"
-                )
-            lines.append("")
+        return lines
+
+    lines.append(f"**Total flagged rows:** {total_rows} across {len(by_member)} members")
+    lines.append("")
+
+    for member, rows in by_member.items():
+        lines.append(f"### {escape_md_cell(member)}")
+        lines.append("")
+        lines.append("| Ticket | Title | Reason |")
+        lines.append("|--------|-------|--------|")
+        for row in rows:
+            key_link = jira_issue_link(jira_site_url, row.get("key"))
+            title = escape_md_cell(row.get("title", ""))
+            reason = escape_md_cell(row.get("reason", ""))
+            lines.append(f"| {key_link} | {title} | {reason} |")
+        lines.append("")
 
     return lines
 
@@ -400,6 +543,7 @@ def render_report(
     jira_site_url: str | None = None,
     timeline: list[dict[str, Any]] | None = None,
     bug_effort: list[dict[str, Any]] | None = None,
+    config: dict[str, Any] | None = None,
 ) -> str:
     issue_by_key = {i["key"]: i for i in issues}
     est_by_key = {x["key"]: x.get("estimateSeconds", 0) for x in engine.get("items", [])}
@@ -414,8 +558,6 @@ def render_report(
 
     scheduled = schedule.get("scheduled", [])
     unscheduled = schedule.get("unscheduled", [])
-    violations = schedule.get("violations", [])
-
     status_counts: dict[str, int] = defaultdict(int)
     for s in scheduled:
         status_counts[s.get("status", "on_track")] += 1
@@ -464,8 +606,18 @@ def render_report(
         )
     lines.append("")
 
+    timeline_epic_keys = (
+        {e.get("epicKey") for e in timeline if e.get("epicKey")} if timeline else set()
+    )
+
     lines.append("## Delivery items (Epics)")
     lines.append("")
+    if timeline_epic_keys:
+        lines.append(
+            "Click a **Title** to jump to that epic's PRD detail in "
+            "[Timeline breakdown](#timeline-breakdown-jira) below."
+        )
+        lines.append("")
     lines.append(
         "| Epic | Title | Start | Due | Phase | Status | Scheduled tasks | Unscheduled |"
     )
@@ -486,7 +638,10 @@ def render_report(
         epic_issue = issue_by_key.get(epic_key)
         if epic_issue and not is_epic_issue(epic_issue):
             continue
-        epic_summary = escape_md_cell(resolve_epic_summary(epic_key, issues, issue_by_key))
+        epic_summary = resolve_epic_summary(epic_key, issues, issue_by_key)
+        title_cell = epic_title_link(
+            epic_summary, epic_key, epic_key in timeline_epic_keys
+        )
         epic_link = jira_issue_link(jira_site_url, epic_key)
         rollup = compute_epic_rollup(epic_key, scheduled, unscheduled, engine_items)
         phase = phase_for_epic(epic_key, issues, status_map)
@@ -494,7 +649,7 @@ def render_report(
         due_s = rollup["due"] or "TBD"
         status_s = rollup["status"] if rollup["status"] != "tbd" else "TBD"
         lines.append(
-            f"| {epic_link} | {epic_summary} | {start_s} | {due_s} | {phase} | {status_s} "
+            f"| {epic_link} | {title_cell} | {start_s} | {due_s} | {phase} | {status_s} "
             f"| {rollup['scheduled_count']} | {rollup['unscheduled_count']} |"
         )
 
@@ -502,49 +657,39 @@ def render_report(
     if timeline:
         lines.extend(render_timeline_sections(timeline, jira_site_url))
     if bug_effort:
-        lines.extend(render_bug_sections(bug_effort, jira_site_url))
-    lines.append("## Schedule by assignee")
-    lines.append("")
+        bug_by_key = {e["epicKey"]: e for e in bug_effort}
+        ordered_bug = [
+            bug_by_key[k]
+            for k in sorted(epic_keys, key=epic_sort_key)
+            if k in bug_by_key
+        ]
+        lines.extend(render_bug_sections(ordered_bug, jira_site_url))
+    lines.extend(
+        render_team_tasks_plan(
+            by_assignee,
+            assignee_names,
+            issue_by_key,
+            est_by_key,
+            jira_site_url,
+            config,
+        )
+    )
 
-    for assignee_id, rows in sorted(by_assignee.items(), key=lambda x: assignee_names.get(x[0], x[0])):
-        display = assignee_names.get(assignee_id, assignee_id)
-        lines.append(f"### {display}")
-        lines.append("")
-        lines.append("| Key | Story | Epic | Effort | Start | Due | Status | Notes |")
-        lines.append("|-----|-------|------|--------|-------|-----|--------|-------|")
-        for r in rows:
-            issue = issue_by_key.get(r["key"], {})
-            summary = (issue.get("fields") or {}).get("summary", "")[:40]
-            notes = "; ".join(r.get("dependencyNotes") or []) or summary
-            key_link = jira_issue_link(jira_site_url, r["key"])
-            story_link = jira_issue_link(jira_site_url, r.get("storyKey"))
-            epic_col = jira_issue_link(jira_site_url, r.get("epicKey"))
-            lines.append(
-                f"| {key_link} | {story_link} | {epic_col} "
-                f"| {format_effort(est_by_key.get(r['key']))} | {r['startDate']} | {r['dueDate']} "
-                f"| {r['status']} | {notes} |"
-            )
-        lines.append("")
+    quality_by_member = build_data_quality_by_member(
+        issues, schedule, engine, timeline, assignee_names, config
+    )
+    lines.extend(render_data_quality_section(quality_by_member, jira_site_url))
 
-    lines.append("## Data quality flags")
-    lines.append("")
-    missing = [u["key"] for u in unscheduled if u.get("reason") == "missing_estimate"]
-    lines.append(f"- Missing estimates: {', '.join(missing[:30])}{'…' if len(missing) > 30 else ''}")
-    lines.append(f"- Unscheduled count: {len(unscheduled)}")
-    if violations:
-        lines.append(f"- Dependency violations: {len(violations)}")
-        for v in violations[:10]:
-            lines.append(f"  - {v.get('key')}: {v.get('issue')}")
-    else:
-        lines.append("- Dependency violations: none")
-
-    lines.append("")
     lines.append("## Recommended actions")
     lines.append("")
-    if missing:
-        lines.append(f"1. Add Original Estimate on {len(missing)} unscheduled items before planning sign-off.")
-    lines.append("2. Review delayed/at-risk epics and tasks before sprint end.")
-    lines.append("3. Ensure backend API tasks complete before dependent Mobile/Web/QA work.")
+    missing_n = len([u for u in unscheduled if u.get("reason") == "missing_estimate"])
+    n = 1
+    if missing_n:
+        lines.append(
+            f"{n}. Add Original Estimate on {missing_n} unscheduled items (Jira start/due not required)."
+        )
+        n += 1
+    lines.append(f"{n}. Review delayed/at-risk epics before sprint end.")
     lines.append("")
 
     return "\n".join(lines)
@@ -584,13 +729,15 @@ def main() -> None:
     schedule = json.loads(Path(args.schedule).read_text())
     engine = json.loads(Path(args.engine_input).read_text())
 
+    cfg: dict | None = None
     jira_site_url = args.jira_site_url
-    if not jira_site_url and Path(args.config).exists():
+    if Path(args.config).exists():
         try:
             import yaml
 
             cfg = yaml.safe_load(Path(args.config).read_text()) or {}
-            jira_site_url = (cfg.get("jira") or {}).get("siteUrl")
+            if not jira_site_url:
+                jira_site_url = (cfg.get("jira") or {}).get("siteUrl")
         except ImportError:
             pass
 
@@ -628,6 +775,7 @@ def main() -> None:
         jira_site_url=jira_site_url,
         timeline=timeline_data,
         bug_effort=bug_data,
+        config=cfg,
     )
 
     out_path = args.output or f"reports/sprint-{datetime.now().strftime('%Y-%m-%d')}.md"

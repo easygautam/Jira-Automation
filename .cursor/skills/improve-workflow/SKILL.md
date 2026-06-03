@@ -61,6 +61,17 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`em-orchest
 
 ## Changelog
 
+- 2026-06-03 — Bug fix effort: one row per sprint epic (including zero bugs); Bugs column; order matches Delivery items.
+- 2026-06-03 — Bug fix effort: epic table (Epic ID, Name, Backend/Web/Mobile); member detail without team column. Schedule index removed; **Team tasks plan** replaces Schedule by assignee.
+- 2026-06-03 — Bug fix effort: hours from `timespent` (worklog) only; Original Estimate excluded from rollup.
+- 2026-06-03 — Delivery items: epic Title links to Timeline PRD detail (`#prd-{epicKey}`).
+- 2026-06-03 — Schedule by assignee: team index table (start/end/total effort) with anchor links to per-member task tables.
+- 2026-06-03 — Bug effort from time spent: `effective_estimate_seconds` uses `timespent` when OE empty; DQ skips missing-estimate for logged bugs; fetch includes `timespent`.
+- 2026-06-03 — No dependency violations when blocker unscheduled; Schedule by assignee drops Start/Due columns (dates are engine-calculated, not Jira).
+- 2026-06-03 — Data quality flags: per-member tables (Ticket, Title, Reason) via `data_quality.py`.
+- 2026-06-03 — Bug fix effort: epic-wise member/team hour totals only (removed per-bug issue lists from JSON and report).
+- 2026-06-03 — Schedule by assignee: Story column replaced with Task title (Jira summary on the task).
+- 2026-06-03 — Removed Mobile/Web integration buffer (10% extra duration and report notes); BE start-after dependency unchanged.
 - 2026-06-03 — Token cleanup: `.cursor/WORKFLOW.md` manifest; slimmed sprint-report/jira-domain/improve-workflow; removed `render_bug_report.py` and legacy `timeline-breakdown-*.md`; expanded `.gitignore` for generated reports.
 - 2026-06-03 — Workflow inventory sync: `jira_teams.py`, pipe-prefix → Other, member-by-side timeline, Task/Sub-task timeline effort, inline bug effort.
 - 2026-06-02 — Jira-driven timeline breakdown (`timeline_breakdown.py`, 6h/day).
