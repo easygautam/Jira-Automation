@@ -8,24 +8,33 @@ from typing import Any
 
 from jira_normalize import (
     assignee_id,
+    bug_missing_logged_time,
     build_index,
-    effective_estimate_seconds,
+    estimate_seconds,
     get_field,
-    has_actionable_bug_effort,
+    is_bug_issue,
     issue_type_name,
     resolve_epic,
-)
-
-SCHEDULABLE_TYPES = frozenset(
-    {"task", "sub-task", "subtask", "bug", "test execution"}
+    SCHEDULABLE_TYPES,
 )
 
 REASON_MISSING_ESTIMATE = "Missing estimates"
+REASON_MISSING_LOGGED_TIME = "Missing logged time"
 REASON_PARENT_NOT_MAPPED = "Parent not mapped"
 REASON_EPIC_NOT_MAPPED = "Epic not mapped"
 REASON_PARENT_OUT_OF_SCOPE = "Parent not in sprint"
 REASON_TIMELINE_UNMAPPED = "Timeline mapping"
 REASON_UNASSIGNED = "Unassigned"
+
+REASON_SORT_ORDER = (
+    REASON_MISSING_ESTIMATE,
+    REASON_MISSING_LOGGED_TIME,
+    REASON_PARENT_NOT_MAPPED,
+    REASON_PARENT_OUT_OF_SCOPE,
+    REASON_EPIC_NOT_MAPPED,
+    REASON_TIMELINE_UNMAPPED,
+    REASON_UNASSIGNED,
+)
 
 
 def assignee_display(issue: dict[str, Any], assignee_names: dict[str, str]) -> str:
@@ -61,9 +70,10 @@ def collect_issue_flags(
         elif resolve_epic(issue, index) is None:
             reasons.append(REASON_EPIC_NOT_MAPPED)
 
-    if has_actionable_bug_effort(issue, config):
-        pass
-    elif key in unscheduled_keys or effective_estimate_seconds(issue, config) <= 0:
+    if is_bug_issue(issue):
+        if bug_missing_logged_time(issue, config):
+            reasons.append(REASON_MISSING_LOGGED_TIME)
+    elif key in unscheduled_keys or estimate_seconds(issue, config) <= 0:
         if REASON_MISSING_ESTIMATE not in reasons:
             reasons.append(REASON_MISSING_ESTIMATE)
 
@@ -73,16 +83,62 @@ def collect_issue_flags(
     return reasons
 
 
+def consolidate_dq_rows(
+    by_member: dict[str, list[dict[str, str]]],
+) -> dict[str, list[dict[str, str]]]:
+    """Merge multiple rows for the same (member, key) into one semicolon-separated reason."""
+    consolidated: dict[str, list[dict[str, str]]] = {}
+    reason_rank = {r: i for i, r in enumerate(REASON_SORT_ORDER)}
+
+    for member, rows in by_member.items():
+        grouped: dict[str, dict[str, str]] = {}
+        for row in rows:
+            key = row["key"]
+            if key not in grouped:
+                grouped[key] = {"key": key, "title": row["title"], "reasons": []}
+            grouped[key]["reasons"].append(row["reason"])
+
+        merged: list[dict[str, str]] = []
+        for key in sorted(grouped.keys()):
+            entry = grouped[key]
+            unique_reasons = sorted(
+                set(entry["reasons"]),
+                key=lambda r: (reason_rank.get(r, len(REASON_SORT_ORDER)), r),
+            )
+            merged.append(
+                {
+                    "key": key,
+                    "title": entry["title"],
+                    "reason": "; ".join(unique_reasons),
+                }
+            )
+        consolidated[member] = merged
+
+    return consolidated
+
+
+def count_dq_reasons(by_member: dict[str, list[dict[str, str]]]) -> dict[str, int]:
+    """Count each reason label across consolidated rows (split on '; ')."""
+    counts: dict[str, int] = defaultdict(int)
+    for rows in by_member.values():
+        for row in rows:
+            for part in row["reason"].split("; "):
+                part = part.strip()
+                if part:
+                    counts[part] += 1
+    return dict(counts)
+
+
 def build_data_quality_by_member(
     issues: list[dict[str, Any]],
     schedule: dict[str, Any],
-    engine: dict[str, Any],
     timeline: list[dict[str, Any]] | None = None,
     assignee_names: dict[str, str] | None = None,
     config: dict[str, Any] | None = None,
 ) -> dict[str, list[dict[str, str]]]:
     """
     Return {member_display_name: [{key, title, reason}, ...]} sorted by member then key.
+    One row per ticket per member; multiple reasons joined with '; '.
     """
     names = assignee_names or {}
     index = build_index(issues)
@@ -100,8 +156,6 @@ def build_data_quality_by_member(
             {"key": key, "title": title[:120], "reason": reason}
         )
 
-    issue_by_key = {i["key"]: i for i in issues if i.get("key")}
-
     for issue in issues:
         key = issue.get("key")
         if not key:
@@ -117,18 +171,16 @@ def build_data_quality_by_member(
                 ukey = u.get("key")
                 if not ukey:
                     continue
-                issue = issue_by_key.get(ukey, {})
+                issue = index.get(ukey, {})
                 member = u.get("assignee") or (
                     assignee_display(issue, names) if issue else "Unassigned"
                 )
                 title = u.get("summary") or issue_title(issue, ukey)
                 add(member, ukey, title, REASON_TIMELINE_UNMAPPED)
 
-    for member in by_member:
-        by_member[member].sort(key=lambda r: (r["reason"], r["key"]))
-
+    consolidated = consolidate_dq_rows(dict(by_member))
     return dict(
-        sorted(by_member.items(), key=lambda x: (x[0] == "Unassigned", x[0].lower()))
+        sorted(consolidated.items(), key=lambda x: (x[0] == "Unassigned", x[0].lower()))
     )
 
 
@@ -140,7 +192,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build data-quality JSON by member")
     parser.add_argument("--issues", required=True)
     parser.add_argument("--schedule", required=True)
-    parser.add_argument("--engine-input", required=True)
+    parser.add_argument("--engine-input", default=None, help="Deprecated; ignored")
     parser.add_argument("--timeline-breakdown", default=None)
     parser.add_argument("--config", default=".cursor/config/em-config.yaml")
     parser.add_argument("--output", default=None)
@@ -154,7 +206,6 @@ def main() -> None:
 
     issues = load(args.issues)
     schedule = json.loads(Path(args.schedule).read_text(encoding="utf-8"))
-    engine = json.loads(Path(args.engine_input).read_text(encoding="utf-8"))
     timeline = None
     if args.timeline_breakdown and Path(args.timeline_breakdown).exists():
         timeline = json.loads(Path(args.timeline_breakdown).read_text(encoding="utf-8"))
@@ -177,7 +228,7 @@ def main() -> None:
             pass
 
     result = build_data_quality_by_member(
-        issues, schedule, engine, timeline, assignee_names, config
+        issues, schedule, timeline, assignee_names, config
     )
     out = json.dumps(result, indent=2)
     if args.output:

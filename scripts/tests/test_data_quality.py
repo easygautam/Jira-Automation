@@ -10,12 +10,24 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from data_quality import (  # noqa: E402
+    REASON_EPIC_NOT_MAPPED,
     REASON_MISSING_ESTIMATE,
+    REASON_MISSING_LOGGED_TIME,
     REASON_PARENT_NOT_MAPPED,
     REASON_PARENT_OUT_OF_SCOPE,
     REASON_TIMELINE_UNMAPPED,
+    REASON_UNASSIGNED,
     build_data_quality_by_member,
+    consolidate_dq_rows,
+    count_dq_reasons,
 )
+
+CONFIG = {
+    "fields": {"timeSpent": "timespent"},
+    "dataQuality": {
+        "bugActiveStatuses": ["To Do", "In Progress", "Hold", "Deferred"],
+    },
+}
 
 
 def _issue(
@@ -25,11 +37,15 @@ def _issue(
     parent_key: str | None = "VP-EPIC",
     issuetype: str = "Task",
     assignee: str = "Alice",
+    status: str = "In Progress",
+    timespent: int = 0,
 ) -> dict:
     fields: dict = {
         "summary": summary,
         "timeoriginalestimate": estimate_seconds,
+        "timespent": timespent,
         "issuetype": {"name": issuetype},
+        "status": {"name": status},
         "labels": [],
         "components": [],
     }
@@ -58,13 +74,12 @@ class TestDataQuality(unittest.TestCase):
         epic = _epic("VP-1")
         task = _issue("VP-10", "No estimate task", 0, parent_key="VP-1")
         schedule = {"unscheduled": [{"key": "VP-10", "reason": "missing_estimate"}]}
-        engine = {"items": [{"key": "VP-10", "epicKey": "VP-1"}]}
         result = build_data_quality_by_member(
-            [epic, task], schedule, engine, None, {"Alice": "Alice"}
+            [epic, task], schedule, None, {"Alice": "Alice"}
         )
         self.assertIn("Alice", result)
         reasons = [r["reason"] for r in result["Alice"]]
-        self.assertIn(REASON_MISSING_ESTIMATE, reasons)
+        self.assertIn(REASON_MISSING_ESTIMATE, reasons[0])
         self.assertEqual(result["Alice"][0]["key"], "VP-10")
 
     def test_parent_not_mapped(self):
@@ -72,12 +87,11 @@ class TestDataQuality(unittest.TestCase):
         result = build_data_quality_by_member(
             [task],
             {"unscheduled": []},
-            {"items": []},
             None,
             {"Alice": "Alice"},
         )
         self.assertTrue(
-            any(r["reason"] == REASON_PARENT_NOT_MAPPED for r in result["Alice"])
+            any(REASON_PARENT_NOT_MAPPED in r["reason"] for r in result["Alice"])
         )
 
     def test_parent_out_of_sprint(self):
@@ -85,37 +99,195 @@ class TestDataQuality(unittest.TestCase):
         result = build_data_quality_by_member(
             [task],
             {"unscheduled": []},
-            {"items": []},
             None,
             {"Alice": "Alice"},
         )
         self.assertTrue(
-            any(r["reason"] == REASON_PARENT_OUT_OF_SCOPE for r in result["Alice"])
+            any(REASON_PARENT_OUT_OF_SCOPE in r["reason"] for r in result["Alice"])
         )
 
-    def test_bug_with_timespent_skips_missing_estimate(self):
+    def test_epic_not_mapped(self):
+        story = {
+            "key": "VP-STORY",
+            "fields": {
+                "summary": "Story slice",
+                "issuetype": {"name": "Story"},
+            },
+        }
+        task = _issue("VP-40", "Task under story", parent_key="VP-STORY")
+        result = build_data_quality_by_member(
+            [story, task],
+            {"unscheduled": []},
+            None,
+            {"Alice": "Alice"},
+        )
+        self.assertTrue(
+            any(REASON_EPIC_NOT_MAPPED in r["reason"] for r in result["Alice"])
+        )
+
+    def test_consolidate_single_reason(self):
+        raw = {
+            "Alice": [{"key": "VP-1", "title": "T", "reason": REASON_MISSING_ESTIMATE}]
+        }
+        merged = consolidate_dq_rows(raw)
+        self.assertEqual(merged["Alice"][0]["reason"], REASON_MISSING_ESTIMATE)
+
+    def test_bug_active_todo_no_time_flag(self):
         epic = _epic("VP-3")
         bug = _issue(
             "VP-50",
-            "Logged bug",
+            "New bug",
             0,
             parent_key="VP-3",
             issuetype="Bug",
             assignee="Carol",
+            status="TO  DO",
+            timespent=0,
         )
-        bug["fields"]["timespent"] = 7200
         schedule = {"unscheduled": [{"key": "VP-50", "reason": "missing_estimate"}]}
-        engine = {"items": [{"key": "VP-50", "epicKey": "VP-3", "estimateSeconds": 7200}]}
         result = build_data_quality_by_member(
             [epic, bug],
             schedule,
-            engine,
             None,
             {"Carol": "Carol"},
-            {"fields": {"timeSpent": "timespent"}},
+            CONFIG,
         )
         reasons = [r["reason"] for r in result.get("Carol", [])]
-        self.assertNotIn(REASON_MISSING_ESTIMATE, reasons)
+        self.assertEqual(reasons, [])
+
+    def test_bug_deferred_no_time_flag(self):
+        epic = _epic("VP-3")
+        bug = _issue(
+            "VP-51",
+            "Deferred bug",
+            0,
+            parent_key="VP-3",
+            issuetype="Bug",
+            assignee="Carol",
+            status="Deferred",
+            timespent=0,
+        )
+        result = build_data_quality_by_member(
+            [epic, bug],
+            {"unscheduled": []},
+            None,
+            {"Carol": "Carol"},
+            CONFIG,
+        )
+        self.assertEqual(result.get("Carol", []), [])
+
+    def test_bug_not_a_bug_skips_missing_logged_time(self):
+        epic = _epic("VP-3")
+        bug = _issue(
+            "VP-55",
+            "Rejected defect",
+            0,
+            parent_key="VP-3",
+            issuetype="Bug",
+            assignee="Carol",
+            status="Not a Bug",
+            timespent=0,
+        )
+        result = build_data_quality_by_member(
+            [epic, bug],
+            {"unscheduled": []},
+            None,
+            {"Carol": "Carol"},
+            CONFIG,
+        )
+        self.assertEqual(result.get("Carol", []), [])
+
+    def test_bug_ready_for_qa_without_logged_time(self):
+        epic = _epic("VP-3")
+        bug = _issue(
+            "VP-52",
+            "QA bug",
+            0,
+            parent_key="VP-3",
+            issuetype="Bug",
+            assignee="Carol",
+            status="Ready For QA",
+            timespent=0,
+        )
+        result = build_data_quality_by_member(
+            [epic, bug],
+            {"unscheduled": []},
+            None,
+            {"Carol": "Carol"},
+            CONFIG,
+        )
+        self.assertIn(REASON_MISSING_LOGGED_TIME, result["Carol"][0]["reason"])
+
+    def test_bug_ready_for_qa_with_logged_time(self):
+        epic = _epic("VP-3")
+        bug = _issue(
+            "VP-53",
+            "Logged QA bug",
+            0,
+            parent_key="VP-3",
+            issuetype="Bug",
+            assignee="Carol",
+            status="Ready For QA",
+            timespent=7200,
+        )
+        result = build_data_quality_by_member(
+            [epic, bug],
+            {"unscheduled": []},
+            None,
+            {"Carol": "Carol"},
+            CONFIG,
+        )
+        self.assertEqual(result.get("Carol", []), [])
+
+    def test_bug_with_timespent_skips_missing_logged_time(self):
+        epic = _epic("VP-3")
+        bug = _issue(
+            "VP-54",
+            "Closed bug",
+            0,
+            parent_key="VP-3",
+            issuetype="Bug",
+            assignee="Carol",
+            status="Closed",
+            timespent=7200,
+        )
+        result = build_data_quality_by_member(
+            [epic, bug],
+            {"unscheduled": []},
+            None,
+            {"Carol": "Carol"},
+            CONFIG,
+        )
+        self.assertEqual(result.get("Carol", []), [])
+
+    def test_consolidate_multiple_reasons(self):
+        raw = {
+            "Unassigned": [
+                {"key": "VP-1", "title": "Bug", "reason": REASON_MISSING_LOGGED_TIME},
+                {"key": "VP-1", "title": "Bug", "reason": REASON_PARENT_OUT_OF_SCOPE},
+                {"key": "VP-1", "title": "Bug", "reason": REASON_UNASSIGNED},
+            ]
+        }
+        merged = consolidate_dq_rows(raw)
+        self.assertEqual(len(merged["Unassigned"]), 1)
+        reason = merged["Unassigned"][0]["reason"]
+        self.assertIn(REASON_MISSING_LOGGED_TIME, reason)
+        self.assertIn(REASON_PARENT_OUT_OF_SCOPE, reason)
+        self.assertIn(REASON_UNASSIGNED, reason)
+
+    def test_count_dq_reasons(self):
+        by_member = {
+            "Alice": [
+                {
+                    "key": "VP-1",
+                    "title": "T",
+                    "reason": f"{REASON_MISSING_ESTIMATE}; {REASON_UNASSIGNED}",
+                }
+            ]
+        }
+        counts = count_dq_reasons(by_member)
+        self.assertEqual(counts[REASON_MISSING_ESTIMATE], 1)
+        self.assertEqual(counts[REASON_UNASSIGNED], 1)
 
     def test_timeline_unmapped(self):
         epic = _epic("VP-2")
@@ -136,12 +308,11 @@ class TestDataQuality(unittest.TestCase):
         result = build_data_quality_by_member(
             [epic, task],
             {"unscheduled": [], "violations": []},
-            {"items": []},
             timeline,
             {"Bob": "Bob"},
         )
         self.assertTrue(
-            any(r["reason"] == REASON_TIMELINE_UNMAPPED for r in result["Bob"])
+            any(REASON_TIMELINE_UNMAPPED in r["reason"] for r in result["Bob"])
         )
 
 

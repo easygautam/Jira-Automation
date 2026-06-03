@@ -21,7 +21,7 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`em-orchest
 | Issue hierarchy / effort | `jira-domain`, `jira_normalize.py`, `em-config.yaml` |
 | Team / summary prefixes | `jira_teams.py`, `jira-domain`, `timeline_breakdown.py`, `bug_effort_breakdown.py`, `jira_normalize.py`, `WORKFLOW.md`, tests |
 | Delivery phases / deps | `delivery-flow`, `schedule_engine.py`, `sprint-report` |
-| Report format | `sprint-report`, `em-orchestrator`, `render_report.py` |
+| Report format | `sprint-report`, `em-orchestrator`, `render_report.py`, `schedule_delta.py` |
 | New command | command file + `em-workflow.mdc` + `WORKFLOW.md` + orchestrator skill |
 | Jira field mapping | `em-config.yaml`, `jira-domain`, `jira_normalize.py`, `sprint_meta.py` |
 | Sprint window / epic rollup | `sprint_meta.py`, `render_report.py`, `sprint-report` |
@@ -61,6 +61,12 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`em-orchest
 
 ## Changelog
 
+- 2026-06-03 — Epic sort: Jira Rank (LexoRank / `fields.rank`) for Delivery items, Timeline, and Bug fix effort; shared `epic_jira_sort_key` in `jira_normalize.py`.
+- 2026-06-03 — Delivery items sort: PRD-titled epics first, then nearest due date (`delivery_epic_sort_key`). *(superseded by Jira Rank sort)*
+- 2026-06-03 — Bug DQ: `bugNoWorklogStatuses` (Not a Bug) skip missing-logged-time flags and unscheduled noise.
+- 2026-06-03 — Code cleanup: shared epic helpers in `jira_normalize.py`, removed dead code, deduped DQ index, simplified rollup.
+- 2026-06-03 — Schedule Delta (`schedule_delta.py`); config-driven `statusPhaseMap`; unscheduled breakdown narrative; WORKFLOW inventory + DQ CLI note.
+- 2026-06-03 — Status-aware bug DQ: active bugs skip time flags; past-active bugs need worklog (`Missing logged time`); DQ reason summary + consolidated ticket rows; split recommended actions.
 - 2026-06-03 — Bug fix effort: one row per sprint epic (including zero bugs); Bugs column; order matches Delivery items.
 - 2026-06-03 — Bug fix effort: epic table (Epic ID, Name, Backend/Web/Mobile); member detail without team column. Schedule index removed; **Team tasks plan** replaces Schedule by assignee.
 - 2026-06-03 — Bug fix effort: hours from `timespent` (worklog) only; Original Estimate excluded from rollup.

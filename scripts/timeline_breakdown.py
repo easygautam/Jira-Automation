@@ -17,6 +17,15 @@ try:
 except ImportError:
     yaml = None  # type: ignore
 
+from jira_normalize import (
+    epic_summary,
+    get_field,
+    is_bug_issue,
+    is_epic_issue,
+    issue_type_name,
+    resolve_epic_key,
+    sort_epic_keys,
+)
 from jira_teams import (
     TEAM_OTHER,
     mapping_rule_applies,
@@ -36,35 +45,16 @@ def load_config(path: Path) -> dict[str, Any]:
     return {}
 
 
-def get_field(issue: dict[str, Any], name: str) -> Any:
-    return (issue.get("fields") or {}).get(name)
-
-
-def issue_type_name(issue: dict[str, Any]) -> str:
-    return (get_field(issue, "issuetype") or {}).get("name", "").lower()
-
-
 def is_task_or_subtask(issue: dict[str, Any]) -> bool:
     """Timeline effort counts only Task and Sub-task issue types."""
     itype = issue_type_name(issue)
     return itype in ("task", "sub-task", "subtask")
 
 
-def is_bug_issue(issue: dict[str, Any]) -> bool:
-    return issue_type_name(issue) == "bug"
-
-
-def is_epic_issue(issue: dict[str, Any]) -> bool:
-    it = get_field(issue, "issuetype") or {}
-    if (it.get("name") or "").lower() == "epic":
-        return True
-    return (it.get("hierarchyLevel") or 0) > 0
-
-
-def side_display(team: str, side_display: dict[str, str]) -> str:
+def side_display(team: str, side_display_map: dict[str, str]) -> str:
     if team in ("other", "unknown"):
-        return side_display.get("other") or side_display.get("unknown", "Other")
-    return side_display.get(team, side_display.get("other", "Other"))
+        return side_display_map.get("other") or side_display_map.get("unknown", "Other")
+    return side_display_map.get(team, side_display_map.get("other", "Other"))
 
 
 def canonical_side(
@@ -77,33 +67,6 @@ def canonical_side(
     if raw in TEAM_PLAN_SIDES:
         return raw
     return side_display(str(raw).lower(), side_display_map)
-
-
-def resolve_epic_key(issue: dict[str, Any], index: dict[str, dict[str, Any]]) -> str | None:
-    if is_epic_issue(issue):
-        return issue.get("key")
-    parent = get_field(issue, "parent")
-    if not parent:
-        return None
-    parent_key = parent.get("key")
-    if not parent_key or parent_key not in index:
-        return None
-    parent_issue = index[parent_key]
-    if is_epic_issue(parent_issue):
-        return parent_key
-    return resolve_epic_key(parent_issue, index)
-
-
-def epic_summary(epic_key: str, issues: list[dict], index: dict[str, dict]) -> str:
-    epic = index.get(epic_key)
-    if epic:
-        return (get_field(epic, "summary") or epic_key).strip()
-    for issue in issues:
-        parent = get_field(issue, "parent") or {}
-        if parent.get("key") == epic_key:
-            pf = parent.get("fields") or {}
-            return (pf.get("summary") or epic_key).strip()
-    return epic_key
 
 
 def assignee_name(issue: dict[str, Any]) -> str:
@@ -369,7 +332,7 @@ def build_timeline_breakdown(
 
     results: list[dict[str, Any]] = []
 
-    for epic_key in sorted(epic_keys):
+    for epic_key in sort_epic_keys(epic_keys, index, config):
         epic_issues = [
             i
             for i in issues
@@ -607,7 +570,7 @@ def main() -> None:
     parser.add_argument("--config", default=".cursor/config/em-config.yaml")
     parser.add_argument("--issues", required=True)
     parser.add_argument("--schedule", required=True)
-    parser.add_argument("--engine-input", default=None)
+    parser.add_argument("--engine-input", default=None, help="Deprecated; ignored")
     parser.add_argument("--output", help="Write JSON path")
     args = parser.parse_args()
 

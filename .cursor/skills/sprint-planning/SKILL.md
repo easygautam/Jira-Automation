@@ -24,9 +24,10 @@ Daily morning scrum: discuss task status, delays, challenges, blockers. Use `/da
 When priority changes, or items added/removed from sprint:
 
 1. Re-fetch sprint issues from Jira
-2. Rebuild per-assignee priority queues
-3. Re-run `scripts/schedule_engine.py`
-4. Generate report with **Schedule Delta** vs last `reports/sprint-*.md`
+2. Snapshot prior schedule: `cp scripts/.tmp/schedule.json scripts/.tmp/prior-schedule.json`
+3. Rebuild per-assignee priority queues (`jira_normalize.py`)
+4. Re-run `scripts/schedule_engine.py`
+5. Generate report with **Schedule Delta** (`scripts/schedule_delta.py` diffs prior vs current schedule JSON)
 
 Example: sprint has tasks T1…Tn; member M1 has efforts and T1 start S1, due D1. Epic priority changes → re-sort M1 queue → cascade new start/due for T1 and all following tasks.
 

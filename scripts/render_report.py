@@ -9,8 +9,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from data_quality import build_data_quality_by_member
+from data_quality import (
+    REASON_MISSING_ESTIMATE,
+    REASON_MISSING_LOGGED_TIME,
+    build_data_quality_by_member,
+    count_dq_reasons,
+)
+from jira_normalize import (
+    count_unscheduled_breakdown,
+    epic_jira_sort_key,
+    epic_summary,
+    is_epic_issue,
+    lookup_status_phase,
+)
 from jira_teams import team_from_issue
+from schedule_delta import compute_schedule_delta, delta_has_changes
 from timeline_breakdown import side_display
 
 STATUS_RANK = {"blocked": 0, "delayed": 1, "at_risk": 2, "on_track": 3, "tbd": 4}
@@ -40,16 +53,36 @@ def resolve_epic_summary(
     issues: list[dict],
     issue_by_key: dict[str, dict],
 ) -> str:
-    epic_issue = issue_by_key.get(epic_key)
-    if epic_issue:
-        return ((epic_issue.get("fields") or {}).get("summary") or epic_key).strip()
-    for issue in issues:
-        parent = (issue.get("fields") or {}).get("parent") or {}
-        if parent.get("key") == epic_key:
-            pf = parent.get("fields") or {}
-            if (pf.get("issuetype") or {}).get("name") == "Epic":
-                return (pf.get("summary") or epic_key).strip()
-    return epic_key
+    return epic_summary(epic_key, issues, issue_by_key)
+
+
+def is_prd_epic_title(summary: str, suffix: str = "PRD") -> bool:
+    """True when epic title ends with the PRD suffix (whitespace/case normalized)."""
+    text = " ".join((summary or "").split())
+    if not text:
+        return False
+    needle = " ".join(suffix.lower().split())
+    return text.lower().endswith(needle)
+
+
+def delivery_epic_sort_key(
+    epic_key: str,
+    issue_by_key: dict[str, dict],
+    scheduled: list[dict[str, Any]],
+    unscheduled: list[dict[str, Any]],
+    engine_items: list[dict[str, Any]],
+    issues: list[dict],
+    prd_suffix: str = "PRD",
+    config: dict[str, Any] | None = None,
+) -> tuple:
+    """Delivery items order: Jira Rank (LexoRank), same as board drag-and-drop."""
+    return epic_jira_sort_key(epic_key, issue_by_key, config)
+
+
+def parent_key(issue: dict) -> str | None:
+    """Immediate parent key (used for phase rollup on direct children)."""
+    parent = issue.get("fields", {}).get("parent")
+    return parent.get("key") if parent else None
 
 
 def format_effort(seconds: int | None) -> str:
@@ -62,40 +95,13 @@ def format_effort(seconds: int | None) -> str:
     return f"{int(hours)}h" if hours == int(hours) else f"{hours:.1f}h"
 
 
-def resolve_epic_key(issue: dict) -> str | None:
-    parent = issue.get("fields", {}).get("parent")
-    if not parent:
-        return None
-    pf = parent.get("fields") or {}
-    if (pf.get("issuetype") or {}).get("name") == "Epic":
-        return parent.get("key")
-    return parent.get("key")
-
-
-def story_key(issue: dict) -> str | None:
-    parent = issue.get("fields", {}).get("parent")
-    if not parent:
-        return None
-    pname = ((parent.get("fields") or {}).get("issuetype") or {}).get("name", "")
-    if pname == "Story":
-        return parent.get("key")
-    return parent.get("key")
-
-
-def is_epic_issue(issue: dict) -> bool:
-    it = (issue.get("fields") or {}).get("issuetype") or {}
-    if (it.get("name") or "").lower() == "epic":
-        return True
-    return (it.get("hierarchyLevel") or 0) > 0
-
-
-def phase_for_epic(epic_key: str, issues: list[dict], status_map: dict) -> str:
+def phase_for_epic(epic_key: str, issues: list[dict], config: dict[str, Any] | None = None) -> str:
     statuses = []
     for i in issues:
-        ek = resolve_epic_key(i)
-        if ek == epic_key or i.get("key") == epic_key:
+        pk = parent_key(i)
+        if pk == epic_key or i.get("key") == epic_key:
             s = (i.get("fields", {}).get("status") or {}).get("name", "")
-            statuses.append(status_map.get(s, s or "Unknown"))
+            statuses.append(lookup_status_phase(s, config))
     if not statuses:
         return "Unknown"
     phase_order = [
@@ -457,7 +463,10 @@ def render_data_quality_section(
         "## Data quality flags",
         "",
         "Issues by assignee that need cleanup before planning is reliable. "
-        "Task start/due in reports are **calculated** from estimates — not read from Jira.",
+        "Task start/due in reports are **calculated** from estimates — not read from Jira. "
+        "Bugs in To Do / In Progress / Hold / Deferred are not flagged for missing time; "
+        "Not a Bug and similar rejected statuses skip worklog checks; "
+        "other resolved bugs must have worklog time logged.",
         "",
     ]
     total_rows = sum(len(rows) for rows in by_member.values())
@@ -466,8 +475,16 @@ def render_data_quality_section(
         lines.append("")
         return lines
 
-    lines.append(f"**Total flagged rows:** {total_rows} across {len(by_member)} members")
+    lines.append(f"**Total flagged tickets:** {total_rows} across {len(by_member)} members")
     lines.append("")
+
+    reason_counts = count_dq_reasons(by_member)
+    if reason_counts:
+        lines.append("| Reason | Count |")
+        lines.append("|--------|-------|")
+        for reason in sorted(reason_counts.keys()):
+            lines.append(f"| {escape_md_cell(reason)} | {reason_counts[reason]} |")
+        lines.append("")
 
     for member, rows in by_member.items():
         lines.append(f"### {escape_md_cell(member)}")
@@ -484,6 +501,71 @@ def render_data_quality_section(
     return lines
 
 
+def render_schedule_delta_section(
+    delta: dict[str, list[dict[str, Any]]],
+    jira_site_url: str | None,
+) -> list[str]:
+    if not delta_has_changes(delta):
+        return []
+
+    lines = [
+        "## Schedule Delta",
+        "",
+        "Changes vs prior schedule snapshot (`prior-schedule.json`).",
+        "",
+    ]
+
+    def add_table(title: str, rows: list[dict[str, Any]], headers: list[str], fmt_row) -> None:
+        if not rows:
+            return
+        lines.append(f"### {title} ({len(rows)})")
+        lines.append("")
+        lines.append("| " + " | ".join(headers) + " |")
+        lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
+        for row in rows:
+            lines.append(fmt_row(row))
+        lines.append("")
+
+    add_table(
+        "Newly scheduled",
+        delta.get("newly_scheduled") or [],
+        ["Ticket", "Start", "Due", "Status"],
+        lambda r: (
+            f"| {jira_issue_link(jira_site_url, r['key'])} | {r.get('startDate', '—')} | "
+            f"{r.get('dueDate', '—')} | {r.get('status', '—')} |"
+        ),
+    )
+    add_table(
+        "Newly unscheduled",
+        delta.get("newly_unscheduled") or [],
+        ["Ticket", "Prior start", "Prior due", "Reason"],
+        lambda r: (
+            f"| {jira_issue_link(jira_site_url, r['key'])} | {r.get('priorStart', '—')} | "
+            f"{r.get('priorDue', '—')} | {r.get('reason', '—')} |"
+        ),
+    )
+    add_table(
+        "Date changes",
+        delta.get("date_changes") or [],
+        ["Ticket", "Prior start", "Prior due", "New start", "New due"],
+        lambda r: (
+            f"| {jira_issue_link(jira_site_url, r['key'])} | {r.get('priorStart', '—')} | "
+            f"{r.get('priorDue', '—')} | {r.get('startDate', '—')} | {r.get('dueDate', '—')} |"
+        ),
+    )
+    add_table(
+        "Status changes",
+        delta.get("status_changes") or [],
+        ["Ticket", "Prior status", "New status"],
+        lambda r: (
+            f"| {jira_issue_link(jira_site_url, r['key'])} | {r.get('priorStatus', '—')} | "
+            f"{r.get('status', '—')} |"
+        ),
+    )
+
+    return lines
+
+
 def compute_epic_rollup(
     epic_key: str,
     scheduled: list[dict[str, Any]],
@@ -494,20 +576,9 @@ def compute_epic_rollup(
     unsched_keys = {
         u["key"]
         for u in unscheduled
-        if engine_items
-        and any(
-            x.get("key") == u.get("key") and x.get("epicKey") == epic_key
-            for x in engine_items
-        )
+        for x in engine_items
+        if x.get("key") == u.get("key") and x.get("epicKey") == epic_key
     }
-    # fallback: count unscheduled by epic from engine items
-    if not unsched_keys:
-        unsched_keys = {
-            u["key"]
-            for u in unscheduled
-            for x in engine_items
-            if x.get("key") == u.get("key") and x.get("epicKey") == epic_key
-        }
 
     if not rows:
         return {
@@ -539,11 +610,11 @@ def render_report(
     project: str,
     sprint_label: str,
     sprint_meta: dict | None,
-    status_map: dict[str, str],
     jira_site_url: str | None = None,
     timeline: list[dict[str, Any]] | None = None,
     bug_effort: list[dict[str, Any]] | None = None,
     config: dict[str, Any] | None = None,
+    prior_schedule: dict[str, Any] | None = None,
 ) -> str:
     issue_by_key = {i["key"]: i for i in issues}
     est_by_key = {x["key"]: x.get("estimateSeconds", 0) for x in engine.get("items", [])}
@@ -594,11 +665,28 @@ def render_report(
     ]
 
     risk_n = status_counts.get("delayed", 0) + status_counts.get("at_risk", 0)
+    active_bugs, tasks_missing, other_unsched = count_unscheduled_breakdown(
+        unscheduled, issue_by_key, config
+    )
     if unscheduled:
-        lines.append(
-            f"{len(unscheduled)} items lack Original Estimate and could not be scheduled. "
-            f"{risk_n} scheduled items are at risk or delayed relative to sprint end."
-        )
+        detail: list[str] = []
+        if active_bugs:
+            detail.append(f"{active_bugs} active bugs (estimate not required yet)")
+        if tasks_missing:
+            detail.append(f"{tasks_missing} tasks missing Original Estimate")
+        if other_unsched:
+            detail.append(f"{other_unsched} other (inactive bugs / no effort)")
+        if detail:
+            lines.append(
+                f"{len(unscheduled)} items unscheduled, including "
+                f"{', '.join(detail)}. "
+                f"{risk_n} scheduled items are at risk or delayed relative to sprint end."
+            )
+        else:
+            lines.append(
+                f"{len(unscheduled)} items unscheduled. "
+                f"{risk_n} scheduled items are at risk or delayed relative to sprint end."
+            )
     else:
         lines.append(
             f"{status_counts.get('on_track', 0)} items on track; "
@@ -630,21 +718,31 @@ def render_report(
         if row.get("epicKey"):
             epic_keys.add(row["epicKey"])
 
+    prd_suffix = ((config or {}).get("reporting") or {}).get("prdTitleSuffix", "PRD")
+
     def epic_sort_key(key: str) -> tuple:
-        rollup = compute_epic_rollup(key, scheduled, unscheduled, engine_items)
-        return (epic_priority_rank(key, engine_items), rollup.get("due") or "9999", key)
+        return delivery_epic_sort_key(
+            key,
+            issue_by_key,
+            scheduled,
+            unscheduled,
+            engine_items,
+            issues,
+            prd_suffix,
+            config,
+        )
 
     for epic_key in sorted(epic_keys, key=epic_sort_key):
         epic_issue = issue_by_key.get(epic_key)
         if epic_issue and not is_epic_issue(epic_issue):
             continue
-        epic_summary = resolve_epic_summary(epic_key, issues, issue_by_key)
+        epic_title = resolve_epic_summary(epic_key, issues, issue_by_key)
         title_cell = epic_title_link(
-            epic_summary, epic_key, epic_key in timeline_epic_keys
+            epic_title, epic_key, epic_key in timeline_epic_keys
         )
         epic_link = jira_issue_link(jira_site_url, epic_key)
         rollup = compute_epic_rollup(epic_key, scheduled, unscheduled, engine_items)
-        phase = phase_for_epic(epic_key, issues, status_map)
+        phase = phase_for_epic(epic_key, issues, config)
         start_s = rollup["start"] or "TBD"
         due_s = rollup["due"] or "TBD"
         status_s = rollup["status"] if rollup["status"] != "tbd" else "TBD"
@@ -676,17 +774,29 @@ def render_report(
     )
 
     quality_by_member = build_data_quality_by_member(
-        issues, schedule, engine, timeline, assignee_names, config
+        issues, schedule, timeline, assignee_names, config
     )
     lines.extend(render_data_quality_section(quality_by_member, jira_site_url))
 
+    if prior_schedule:
+        delta = compute_schedule_delta(prior_schedule, schedule)
+        lines.extend(render_schedule_delta_section(delta, jira_site_url))
+
     lines.append("## Recommended actions")
     lines.append("")
-    missing_n = len([u for u in unscheduled if u.get("reason") == "missing_estimate"])
+    reason_counts = count_dq_reasons(quality_by_member)
+    missing_est_n = reason_counts.get(REASON_MISSING_ESTIMATE, 0)
+    missing_log_n = reason_counts.get(REASON_MISSING_LOGGED_TIME, 0)
     n = 1
-    if missing_n:
+    if missing_est_n:
         lines.append(
-            f"{n}. Add Original Estimate on {missing_n} unscheduled items (Jira start/due not required)."
+            f"{n}. Add Original Estimate on {missing_est_n} task(s) missing estimates "
+            "(Jira start/due not required)."
+        )
+        n += 1
+    if missing_log_n:
+        lines.append(
+            f"{n}. Log work time on {missing_log_n} bug(s) past active workflow states."
         )
         n += 1
     lines.append(f"{n}. Review delayed/at-risk epics before sprint end.")
@@ -718,6 +828,11 @@ def main() -> None:
         default="scripts/.tmp/bug-effort-breakdown.json",
         help="Bug effort JSON from bug_effort_breakdown.py (optional)",
     )
+    parser.add_argument(
+        "--prior-schedule",
+        default="scripts/.tmp/prior-schedule.json",
+        help="Prior schedule JSON for Schedule Delta section (optional)",
+    )
     args = parser.parse_args()
 
     issues_payload = json.loads(Path(args.issues).read_text())
@@ -746,14 +861,6 @@ def main() -> None:
     if meta_path.exists():
         sprint_meta = json.loads(meta_path.read_text())
 
-    status_map = {
-        "TO  DO": "PRD Tech Discussion",
-        "To Do": "PRD Tech Discussion",
-        "In Progress": "Development",
-        "Done": "Ready for Release",
-        "QA": "QA Testing",
-    }
-
     timeline_data = None
     tb_path = Path(args.timeline_breakdown)
     if tb_path.exists():
@@ -764,6 +871,11 @@ def main() -> None:
     if bug_path.exists():
         bug_data = json.loads(bug_path.read_text(encoding="utf-8"))
 
+    prior_schedule = None
+    prior_path = Path(args.prior_schedule)
+    if prior_path.exists():
+        prior_schedule = json.loads(prior_path.read_text(encoding="utf-8"))
+
     body = render_report(
         issues,
         schedule,
@@ -771,11 +883,11 @@ def main() -> None:
         args.project,
         args.sprint_label,
         sprint_meta,
-        status_map,
         jira_site_url=jira_site_url,
         timeline=timeline_data,
         bug_effort=bug_data,
         config=cfg,
+        prior_schedule=prior_schedule,
     )
 
     out_path = args.output or f"reports/sprint-{datetime.now().strftime('%Y-%m-%d')}.md"

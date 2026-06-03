@@ -10,19 +10,26 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from jira_normalize import (  # noqa: E402
+    bug_missing_logged_time,
+    build_index,
+    count_unscheduled_breakdown,
     effective_estimate_seconds,
-    has_actionable_bug_effort,
+    is_bug_active_status,
+    lookup_status_phase,
+    normalize_status_name,
+    resolve_epic_key,
     time_spent_seconds,
 )
 
 
-def _bug(key: str, oe: int = 0, spent: int = 0) -> dict:
+def _bug(key: str, oe: int = 0, spent: int = 0, status: str = "To Do") -> dict:
     return {
         "key": key,
         "fields": {
             "issuetype": {"name": "Bug"},
             "timeoriginalestimate": oe,
             "timespent": spent,
+            "status": {"name": status},
         },
     }
 
@@ -38,11 +45,30 @@ def _task(key: str, oe: int = 0, spent: int = 0) -> dict:
     }
 
 
+def _epic(key: str) -> dict:
+    return {
+        "key": key,
+        "fields": {
+            "summary": "Epic",
+            "issuetype": {"name": "Epic", "hierarchyLevel": 1},
+        },
+    }
+
+
 CONFIG = {
     "fields": {
         "originalEstimate": "timeoriginalestimate",
         "timeSpent": "timespent",
-    }
+    },
+    "dataQuality": {
+        "bugActiveStatuses": ["To Do", "In Progress", "Hold", "Deferred"],
+    },
+    "statusPhaseMap": {
+        "To Do": "PRD Tech Discussion",
+        "TO  DO": "PRD Tech Discussion",
+        "In Progress": "Development",
+        "Ready For QA": "QA Testing",
+    },
 }
 
 
@@ -64,10 +90,81 @@ class TestEffectiveEstimate(unittest.TestCase):
         self.assertEqual(effective_estimate_seconds(issue, CONFIG), 0)
         self.assertEqual(time_spent_seconds(issue, CONFIG), 3600)
 
-    def test_has_actionable_bug_effort(self):
-        self.assertTrue(has_actionable_bug_effort(_bug("VP-5", spent=1), CONFIG))
-        self.assertFalse(has_actionable_bug_effort(_bug("VP-6"), CONFIG))
-        self.assertFalse(has_actionable_bug_effort(_task("VP-7", spent=3600), CONFIG))
+
+class TestBugStatusHelpers(unittest.TestCase):
+    def test_normalize_status_name(self):
+        self.assertEqual(normalize_status_name("TO  DO"), "to do")
+        self.assertEqual(normalize_status_name("In  Progress"), "in progress")
+
+    def test_is_bug_active_status_variants(self):
+        self.assertTrue(is_bug_active_status(_bug("VP-8", status="TO  DO"), CONFIG))
+        self.assertTrue(is_bug_active_status(_bug("VP-9", status="In  Progress"), CONFIG))
+        self.assertTrue(is_bug_active_status(_bug("VP-10", status="Deferred"), CONFIG))
+        self.assertFalse(is_bug_active_status(_bug("VP-11", status="Ready For QA"), CONFIG))
+
+    def test_bug_missing_logged_time(self):
+        self.assertFalse(bug_missing_logged_time(_bug("VP-12", status="TO  DO"), CONFIG))
+        self.assertTrue(
+            bug_missing_logged_time(_bug("VP-13", status="Closed", spent=0), CONFIG)
+        )
+        self.assertFalse(
+            bug_missing_logged_time(_bug("VP-14", status="Closed", spent=3600), CONFIG)
+        )
+        self.assertFalse(
+            bug_missing_logged_time(_bug("VP-15", status="Not a Bug", spent=0), CONFIG)
+        )
+
+
+class TestStatusPhaseLookup(unittest.TestCase):
+    def test_lookup_status_phase_exact(self):
+        self.assertEqual(
+            lookup_status_phase("In Progress", CONFIG),
+            "Development",
+        )
+
+    def test_lookup_status_phase_normalized(self):
+        self.assertEqual(
+            lookup_status_phase("TO  DO", CONFIG),
+            "PRD Tech Discussion",
+        )
+        self.assertEqual(
+            lookup_status_phase("Ready For QA", CONFIG),
+            "QA Testing",
+        )
+
+    def test_count_unscheduled_breakdown(self):
+        issues = {
+            "VP-A": _bug("VP-A", status="TO  DO"),
+            "VP-B": _task("VP-B"),
+            "VP-C": _bug("VP-C", status="Closed", spent=0),
+        }
+        unscheduled = [{"key": "VP-A"}, {"key": "VP-B"}, {"key": "VP-C"}]
+        active, tasks, other = count_unscheduled_breakdown(unscheduled, issues, CONFIG)
+        self.assertEqual(active, 1)
+        self.assertEqual(tasks, 1)
+        self.assertEqual(other, 1)
+
+
+class TestResolveEpicKey(unittest.TestCase):
+    def test_walks_story_to_epic(self):
+        epic = _epic("E1")
+        story = {
+            "key": "S1",
+            "fields": {
+                "issuetype": {"name": "Story"},
+                "parent": {"key": "E1"},
+            },
+        }
+        task = {
+            "key": "T1",
+            "fields": {
+                "issuetype": {"name": "Task"},
+                "parent": {"key": "S1"},
+            },
+        }
+        index = build_index([epic, story, task])
+        self.assertEqual(resolve_epic_key(task, index), "E1")
+        self.assertEqual(resolve_epic_key(epic, index), "E1")
 
 
 if __name__ == "__main__":

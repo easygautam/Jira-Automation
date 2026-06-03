@@ -10,32 +10,33 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from jira_normalize import time_spent_seconds
-from timeline_breakdown import (
-    assignee_name,
+from jira_normalize import (
     epic_summary,
     get_field,
     is_bug_issue,
     is_epic_issue,
-    load_config,
     resolve_epic_key,
-    side_display,
+    sort_epic_keys,
+    time_spent_seconds,
 )
 from jira_teams import team_from_issue
+from timeline_breakdown import assignee_name, load_config, side_display
 
 
 def collect_sprint_epic_keys(
     issues: list[dict[str, Any]],
     schedule: dict[str, Any],
+    config: dict[str, Any] | None = None,
 ) -> list[str]:
-    """Epic keys in sprint scope (same set as Delivery items table)."""
+    """Epic keys in sprint scope (same set as Delivery items table), Jira Rank order."""
     keys: set[str] = {i["key"] for i in issues if is_epic_issue(i)}
     for bucket in ("scheduled", "unscheduled"):
         for row in schedule.get(bucket) or []:
             ek = row.get("epicKey")
             if ek:
                 keys.add(ek)
-    return sorted(keys)
+    index = {i["key"]: i for i in issues if i.get("key")}
+    return sort_epic_keys(keys, index, config)
 
 
 def build_bug_effort_breakdown(
@@ -47,7 +48,7 @@ def build_bug_effort_breakdown(
     side_display_map = (config.get("timeline") or {}).get("sideDisplay") or {}
 
     index = {i["key"]: i for i in issues if i.get("key")}
-    epic_keys = collect_sprint_epic_keys(issues, schedule)
+    epic_keys = collect_sprint_epic_keys(issues, schedule, config)
 
     results: list[dict[str, Any]] = []
 

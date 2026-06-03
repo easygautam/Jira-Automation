@@ -28,7 +28,7 @@ Follow `.cursor/skills/jira-domain/SKILL.md`:
 
 1. `getAccessibleAtlassianResources` when `cloudId` empty
 2. Discover Sprint field if needed (`getJiraIssueTypeMetaWithFields`)
-3. `searchJiraIssuesUsingJql` with sprint JQL (substitute `{projectKey}`) — include `fields.sprint`
+3. `searchJiraIssuesUsingJql` with sprint JQL (substitute `{projectKey}`) — include `fields.sprint` and `fields.rank`
 4. Paginate until all issues fetched
 5. Write raw issues to `scripts/.tmp/issues.json`
 6. Extract sprint window:
@@ -53,6 +53,12 @@ python scripts/jira_normalize.py \
 Sprint dates come from `sprint-meta.json` (Jira active sprint). Use `--sprint-start/end` only as manual override if meta fails.
 
 ### CALCULATE
+
+On **recalculate** mode, snapshot the prior schedule before re-running the engine:
+
+```bash
+cp scripts/.tmp/schedule.json scripts/.tmp/prior-schedule.json
+```
 
 ```bash
 python scripts/schedule_engine.py scripts/.tmp/engine-input.json > scripts/.tmp/schedule.json
@@ -95,8 +101,11 @@ python scripts/render_report.py \
   --sprint-meta scripts/.tmp/sprint-meta.json \
   --timeline-breakdown scripts/.tmp/timeline-breakdown.json \
   --bug-breakdown scripts/.tmp/bug-effort-breakdown.json \
+  --prior-schedule scripts/.tmp/prior-schedule.json \
   --project {projectKey}
 ```
+
+`prior-schedule.json` is optional; when present, report includes **Schedule Delta** (newly scheduled/unscheduled, date and status changes).
 
 ### SAVE
 

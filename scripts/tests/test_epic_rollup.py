@@ -9,6 +9,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from render_report import (  # noqa: E402
     compute_epic_rollup,
+    delivery_epic_sort_key,
+    is_prd_epic_title,
     jira_issue_link,
     resolve_epic_summary,
     worst_status,
@@ -63,6 +65,55 @@ class TestEpicRollup(unittest.TestCase):
         ]
         summary = resolve_epic_summary("VP-19350", issues, {})
         self.assertEqual(summary, "Events phase 1 <> PRD")
+
+    def test_is_prd_epic_title(self):
+        self.assertTrue(is_prd_epic_title("Events phase 1 <> PRD"))
+        self.assertTrue(is_prd_epic_title("NSAT Multi category Part 3<>PRD"))
+        self.assertFalse(is_prd_epic_title("Prod Issues AMJ26"))
+        self.assertFalse(is_prd_epic_title("Tech Excellence AMJ26"))
+
+    def test_delivery_epic_sort_jira_rank(self):
+        issues = [
+            {
+                "key": "E1",
+                "fields": {
+                    "summary": "Prod Issues AMJ26",
+                    "issuetype": {"name": "Epic", "hierarchyLevel": 1},
+                    "customfield_10019": "0|i00003:",
+                },
+            },
+            {
+                "key": "E2",
+                "fields": {
+                    "summary": "Events phase 1 <> PRD",
+                    "issuetype": {"name": "Epic", "hierarchyLevel": 1},
+                    "customfield_10019": "0|i00001:",
+                },
+            },
+            {
+                "key": "E3",
+                "fields": {
+                    "summary": "Events Phase 2<>PRD",
+                    "issuetype": {"name": "Epic", "hierarchyLevel": 1},
+                    "customfield_10019": "0|i00002:",
+                },
+            },
+        ]
+        issue_by_key = {i["key"]: i for i in issues}
+        scheduled = [
+            {"epicKey": "E1", "startDate": "2026-06-04", "dueDate": "2026-06-04", "status": "on_track"},
+            {"epicKey": "E2", "startDate": "2026-06-01", "dueDate": "2026-06-12", "status": "delayed"},
+            {"epicKey": "E3", "startDate": "2026-06-02", "dueDate": "2026-06-08", "status": "delayed"},
+        ]
+        engine_items = [{"key": "T1", "epicKey": "E1"}, {"key": "T2", "epicKey": "E2"}, {"key": "T3", "epicKey": "E3"}]
+        config = {"fields": {"rank": "customfield_10019"}}
+        order = sorted(
+            ["E1", "E2", "E3"],
+            key=lambda k: delivery_epic_sort_key(
+                k, issue_by_key, scheduled, [], engine_items, issues, config=config
+            ),
+        )
+        self.assertEqual(order, ["E2", "E3", "E1"])
 
 
 if __name__ == "__main__":

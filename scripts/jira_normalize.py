@@ -17,6 +17,11 @@ except ImportError:
 from jira_teams import team_from_issue
 
 DEFAULT_PRIORITY = ["Highest", "High", "Medium", "Low", "Lowest"]
+DEFAULT_BUG_ACTIVE_STATUSES = ["To Do", "In Progress", "Hold", "Deferred"]
+DEFAULT_BUG_NO_WORKLOG_STATUSES = ["Not a Bug"]
+SCHEDULABLE_TYPES = frozenset(
+    {"task", "sub-task", "subtask", "bug", "test execution"}
+)
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -49,6 +54,9 @@ def is_epic(issue: dict[str, Any]) -> bool:
     if (it.get("name") or "").lower() == "epic":
         return True
     return (it.get("hierarchyLevel") or 0) > 0
+
+
+is_epic_issue = is_epic
 
 
 def get_field(issue: dict[str, Any], name: str) -> Any:
@@ -94,9 +102,141 @@ def effective_estimate_seconds(
     return oe
 
 
-def has_actionable_bug_effort(issue: dict[str, Any], config: dict[str, Any] | None = None) -> bool:
-    """True when a Bug has time spent and should not be flagged as missing estimate."""
-    return is_bug_issue(issue) and time_spent_seconds(issue, config) > 0
+def resolve_epic_key(
+    issue: dict[str, Any], index: dict[str, dict[str, Any]]
+) -> str | None:
+    """Return epic key for an issue by walking parent chain."""
+    if is_epic(issue):
+        return issue.get("key")
+    epic = resolve_epic(issue, index)
+    return epic.get("key") if epic else None
+
+
+def jira_rank(issue: dict[str, Any] | None, config: dict[str, Any] | None = None) -> str:
+    """LexoRank string from Jira Rank field (board drag-and-drop order)."""
+    if not issue:
+        return ""
+    fields_cfg = (config or {}).get("fields") or {}
+    field_id = fields_cfg.get("rank", "customfield_10019")
+    return str(get_field(issue, field_id) or "")
+
+
+def epic_jira_sort_key(
+    epic_key: str,
+    issue_by_key: dict[str, dict[str, Any]],
+    config: dict[str, Any] | None = None,
+) -> tuple:
+    """Sort key: ranked epics first (LexoRank), unranked last, then epic key."""
+    rank = jira_rank(issue_by_key.get(epic_key), config)
+    return (0, rank, epic_key) if rank else (1, epic_key)
+
+
+def sort_epic_keys(
+    epic_keys: set[str] | list[str],
+    issue_by_key: dict[str, dict[str, Any]],
+    config: dict[str, Any] | None = None,
+) -> list[str]:
+    """Return epic keys in Jira board (Rank) order."""
+    return sorted(epic_keys, key=lambda k: epic_jira_sort_key(k, issue_by_key, config))
+
+
+def epic_summary(
+    epic_key: str,
+    issues: list[dict[str, Any]],
+    index: dict[str, dict[str, Any]],
+) -> str:
+    epic = index.get(epic_key)
+    if epic:
+        return (get_field(epic, "summary") or epic_key).strip()
+    for issue in issues:
+        parent = get_field(issue, "parent") or {}
+        if parent.get("key") == epic_key:
+            pf = parent.get("fields") or {}
+            return (pf.get("summary") or epic_key).strip()
+    return epic_key
+
+
+def jira_status_name(issue: dict[str, Any]) -> str:
+    status = get_field(issue, "status") or {}
+    return (status.get("name") or "").strip()
+
+
+def normalize_status_name(name: str) -> str:
+    return " ".join(name.lower().split())
+
+
+def bug_active_statuses(config: dict[str, Any] | None = None) -> set[str]:
+    dq = (config or {}).get("dataQuality") or {}
+    raw = dq.get("bugActiveStatuses") or DEFAULT_BUG_ACTIVE_STATUSES
+    return {normalize_status_name(s) for s in raw}
+
+
+def is_bug_active_status(issue: dict[str, Any], config: dict[str, Any] | None = None) -> bool:
+    if not is_bug_issue(issue):
+        return False
+    return normalize_status_name(jira_status_name(issue)) in bug_active_statuses(config)
+
+
+def bug_no_worklog_statuses(config: dict[str, Any] | None = None) -> set[str]:
+    """Bug statuses where worklog time is not expected (e.g. rejected as not a bug)."""
+    dq = (config or {}).get("dataQuality") or {}
+    raw = dq.get("bugNoWorklogStatuses") or DEFAULT_BUG_NO_WORKLOG_STATUSES
+    return {normalize_status_name(s) for s in raw}
+
+
+def is_bug_no_worklog_status(issue: dict[str, Any], config: dict[str, Any] | None = None) -> bool:
+    if not is_bug_issue(issue):
+        return False
+    return normalize_status_name(jira_status_name(issue)) in bug_no_worklog_statuses(config)
+
+
+def bug_missing_logged_time(issue: dict[str, Any], config: dict[str, Any] | None = None) -> bool:
+    """Bug past active workflow states with no worklog time."""
+    return (
+        is_bug_issue(issue)
+        and not is_bug_active_status(issue, config)
+        and not is_bug_no_worklog_status(issue, config)
+        and time_spent_seconds(issue, config) <= 0
+    )
+
+
+def lookup_status_phase(jira_status: str, config: dict[str, Any] | None = None) -> str:
+    """Map Jira status name to delivery phase; whitespace/case normalized fallback."""
+    raw = (config or {}).get("statusPhaseMap") or {}
+    if jira_status in raw:
+        return str(raw[jira_status])
+    norm = normalize_status_name(jira_status)
+    for key, phase in raw.items():
+        if normalize_status_name(str(key)) == norm:
+            return str(phase)
+    return jira_status or "Unknown"
+
+
+def count_unscheduled_breakdown(
+    unscheduled: list[dict[str, Any]],
+    issue_by_key: dict[str, dict[str, Any]],
+    config: dict[str, Any] | None = None,
+) -> tuple[int, int, int]:
+    """
+    Return (active_bugs, tasks_missing_estimate, other_unscheduled).
+    Active bugs in exempt statuses are expected to lack estimates.
+    """
+    active_bugs = 0
+    tasks_missing = 0
+    other = 0
+    for row in unscheduled:
+        key = row.get("key")
+        if not key:
+            continue
+        issue = issue_by_key.get(key, {})
+        if is_bug_issue(issue):
+            if is_bug_active_status(issue, config) or is_bug_no_worklog_status(issue, config):
+                active_bugs += 1
+            else:
+                other += 1
+        else:
+            tasks_missing += 1
+    return active_bugs, tasks_missing, other
 
 
 def is_blocked(issue: dict[str, Any]) -> bool:

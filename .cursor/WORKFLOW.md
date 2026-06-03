@@ -26,8 +26,10 @@ Team prefixes: `scripts/jira_teams.py` + `em-config.yaml` `teamPrefixMapping` (f
 
 ## Scripts
 
-`sprint_meta.py`, `jira_normalize.py`, `schedule_engine.py`, `timeline_breakdown.py`, `bug_effort_breakdown.py`, `render_report.py`, `jira_teams.py` — tests in `scripts/tests/`, fixtures in `scripts/fixtures/`.
+`sprint_meta.py`, `jira_normalize.py`, `schedule_engine.py`, `schedule_delta.py`, `timeline_breakdown.py`, `bug_effort_breakdown.py`, `data_quality.py`, `render_report.py`, `jira_teams.py` — tests in `scripts/tests/`, fixtures in `scripts/fixtures/`.
+
+Optional debug: `python scripts/data_quality.py --issues ... --schedule ...` (writes per-member DQ JSON; also embedded in report render).
 
 ## Report sections (order)
 
-Executive summary → Delivery items (Epics) → Timeline breakdown (**Teams plan** = Backend/Web/Mobile/QA only; milestones in Task breakdown) → Bug fix effort (epic × Backend/Web/Mobile table + member detail) → Team tasks plan (per-member scheduled tasks) → Data quality (+ Schedule Delta on recalc).
+Executive summary → Delivery items (Epics) → Timeline breakdown (**Teams plan** = Backend/Web/Mobile/QA only; milestones in Task breakdown) → Bug fix effort (epic × Backend/Web/Mobile table + member detail) → Team tasks plan (per-member scheduled tasks) → Data quality (status-aware bug time rules; reason summary; consolidated rows) (+ Schedule Delta on recalc).

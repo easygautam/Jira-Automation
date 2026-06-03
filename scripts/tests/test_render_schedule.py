@@ -12,7 +12,11 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from render_report import (  # noqa: E402
     epic_prd_anchor,
     epic_title_link,
+    phase_for_epic,
     render_bug_sections,
+    render_data_quality_section,
+    render_report,
+    render_schedule_delta_section,
     render_team_tasks_plan,
     schedule_member_anchor,
 )
@@ -44,6 +48,14 @@ CONFIG = {
             "qa": "QA",
             "other": "Other",
         }
+    },
+    "statusPhaseMap": {
+        "To Do": "PRD Tech Discussion",
+        "TO  DO": "PRD Tech Discussion",
+        "In Progress": "Development",
+    },
+    "dataQuality": {
+        "bugActiveStatuses": ["To Do", "In Progress", "Hold", "Deferred"],
     },
 }
 
@@ -139,6 +151,94 @@ class TestBugEffortTable(unittest.TestCase):
         self.assertNotIn("#### By team", body)
         self.assertIn("| Member | Bug effort (h) | Bug count |", body)
         self.assertNotIn("| Member | Team |", body)
+
+
+class TestPhaseForEpic(unittest.TestCase):
+    def test_phase_uses_config_status_map(self):
+        epic = {
+            "key": "E1",
+            "fields": {
+                "summary": "Epic",
+                "issuetype": {"name": "Epic", "hierarchyLevel": 1},
+                "status": {"name": "In Progress"},
+            },
+        }
+        task = {
+            "key": "T1",
+            "fields": {
+                "summary": "Task",
+                "issuetype": {"name": "Task"},
+                "status": {"name": "TO  DO"},
+                "parent": {"key": "E1", "fields": {"issuetype": {"name": "Epic"}}},
+            },
+        }
+        self.assertEqual(phase_for_epic("E1", [epic, task], CONFIG), "Development")
+
+
+class TestDataQualitySection(unittest.TestCase):
+    def test_reason_summary_table(self):
+        by_member = {
+            "Alice": [
+                {
+                    "key": "VP-1",
+                    "title": "Task",
+                    "reason": "Missing estimates; Unassigned",
+                }
+            ]
+        }
+        body = "\n".join(render_data_quality_section(by_member, None))
+        self.assertIn("## Data quality flags", body)
+        self.assertIn("| Reason | Count |", body)
+        self.assertIn("| Missing estimates | 1 |", body)
+        self.assertIn("| Unassigned | 1 |", body)
+
+
+class TestScheduleDeltaSection(unittest.TestCase):
+    def test_renders_date_changes(self):
+        delta = {
+            "newly_scheduled": [],
+            "newly_unscheduled": [],
+            "date_changes": [
+                {
+                    "key": "VP-9",
+                    "priorStart": "2026-06-01",
+                    "priorDue": "2026-06-02",
+                    "startDate": "2026-06-03",
+                    "dueDate": "2026-06-04",
+                }
+            ],
+            "status_changes": [],
+        }
+        body = "\n".join(render_schedule_delta_section(delta, None))
+        self.assertIn("## Schedule Delta", body)
+        self.assertIn("VP-9", body)
+
+
+class TestExecutiveSummary(unittest.TestCase):
+    def test_unscheduled_breakdown_narrative(self):
+        bug = {
+            "key": "B1",
+            "fields": {
+                "summary": "Bug",
+                "issuetype": {"name": "Bug"},
+                "status": {"name": "TO  DO"},
+                "timeoriginalestimate": 0,
+                "timespent": 0,
+            },
+        }
+        task = _issue("T1", "No est", assignee="Alice")
+        task["fields"]["timeoriginalestimate"] = 0
+        body = render_report(
+            [bug, task],
+            {"scheduled": [], "unscheduled": [{"key": "B1"}, {"key": "T1"}]},
+            {"items": [], "sprintStart": "2026-06-01", "sprintEnd": "2026-06-12"},
+            "VP",
+            "Sprint",
+            None,
+            config=CONFIG,
+        )
+        self.assertIn("active bugs (estimate not required yet)", body)
+        self.assertIn("tasks missing Original Estimate", body)
 
 
 if __name__ == "__main__":

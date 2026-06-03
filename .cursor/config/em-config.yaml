@@ -14,6 +14,7 @@ fields:
   originalEstimate: timeoriginalestimate
   timeSpent: timespent           # Bug effort fallback when Original Estimate is empty
   sprint: customfield_10020      # Jira Cloud default; overwritten after auto-discovery
+  rank: customfield_10019        # Jira Rank (LexoRank); drag-and-drop backlog order
 
 scheduling:
   hoursPerDay: 8
@@ -37,21 +38,42 @@ priorityOrder:
 
 statusPhaseMap:
   "To Do": PRD Tech Discussion
+  "TO  DO": PRD Tech Discussion
   "Tech Assessment": Tech Assessment
   "In Progress": Development
+  "In  Progress": Development
   "In Development": Development
   "In Review": Development
+  "In Code Review": Development
+  "Dev Complete": Development
   "QA": QA Testing
   "In QA": QA Testing
+  "IN QA": QA Testing
+  "Ready For QA": QA Testing
   "Bug Fix": Bug fixes
   "Pre-Prod": Pre-Prod Deployments
   "UAT": Product UAT and Design Review
   "Ready for Release": Ready for Release
+  "Ready for release": Ready for Release
   Done: Ready for Release
+  Closed: Ready for Release
+  "Closed.": Ready for Release
+  Deferred: PRD Tech Discussion
 
 reporting:
   outputDir: reports
   filenamePattern: sprint-{date}.md
+  prdTitleSuffix: PRD   # Title suffix for PRD epics (display only; sort uses Jira Rank)
+
+# Data quality: bug time flags use status lists below (whitespace/case normalized)
+dataQuality:
+  bugActiveStatuses:
+    - "To Do"
+    - "In Progress"
+    - "Hold"
+    - "Deferred"
+  bugNoWorklogStatuses:
+    - "Not a Bug"
 
 # First segment before '|' in issue summary → team (case-insensitive: BE, be, Be, etc.)
 teamPrefixMapping:

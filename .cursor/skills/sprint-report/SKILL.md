@@ -25,10 +25,24 @@ Report shape and sections are produced by `scripts/render_report.py` (not hand-a
 
 - Per-assignee scheduled task tables (Key, Task title, Epic, Effort, Status); replaces former Schedule by assignee index
 
+## Data quality flags
+
+- Reason summary table at section top; one row per ticket (multiple reasons joined with `;`)
+- Tasks/sub-tasks: `Missing estimates` when Original Estimate empty
+- Bugs in To Do / In Progress / Hold / Deferred: no time-related flag
+- Bugs in Not a Bug (config: `bugNoWorklogStatuses`): no worklog flag
+- Other resolved bugs need worklog or get `Missing logged time`
+- Recommended actions split task estimates vs bug worklog counts
+
+## Schedule Delta (recalculate)
+
+When `scripts/.tmp/prior-schedule.json` exists, report includes date/status changes vs current schedule.
+
 ## Epic rollup (delivery items)
 
 - **Start** = earliest child task `startDate`; **Due** = latest child `dueDate`
 - **Status** = worst child (blocked > delayed > at_risk > on_track); **TBD** if unscheduled
+- **Sort:** Jira **Rank** field (LexoRank / board drag-and-drop order; `fields.rank` in config)
 - **Title** links to that epic's PRD block in Timeline breakdown (`#prd-{epicKey}`) when timeline data exists
 
 ## Standup mode (`/daily-standup`)
