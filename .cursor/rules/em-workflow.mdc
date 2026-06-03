@@ -1,0 +1,30 @@
+---
+description: Engineering Manager sprint workflow — triggers, config, and report output
+alwaysApply: true
+---
+
+# EM Workflow
+
+When the user runs sprint commands or asks about sprint health, scheduling, standup, or delivery status:
+
+1. Load `.cursor/config/em-config.yaml` before any Jira fetch
+2. Resolve `cloudId` via Atlassian MCP `getAccessibleAtlassianResources` if empty
+3. Follow the matching skill:
+   - `/sprint-report` → `.cursor/skills/sprint-report/SKILL.md`
+   - `/recalculate-schedule` → `.cursor/skills/sprint-planning/SKILL.md` + sprint-report
+   - `/daily-standup` → `.cursor/skills/sprint-report/SKILL.md` (standup mode)
+   - `/improve-workflow` → `.cursor/skills/improve-workflow/SKILL.md`
+4. Save reports to `reports/sprint-{YYYY-MM-DD}.md` (single file; timeline + bug inline)
+5. Pipeline and file inventory: `.cursor/WORKFLOW.md` — runbook: `em-orchestrator` skill
+
+## Trigger phrases
+
+- sprint report, on track, delayed, at risk, blocked
+- recalculate schedule, priority change, re-prioritize
+- daily standup, scrum, blockers, talking points
+- improve workflow, update EM automation
+
+## Orchestration
+
+Primary agent: `.cursor/agents/em-orchestrator.md`  
+Protocol: PLAN → FETCH → NORMALIZE → CALCULATE → TIMELINE_BREAKDOWN → BUG_EFFORT → REPORT → SAVE

@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""Deterministic sprint schedule calculator for EM workflow."""
+
+from __future__ import annotations
+
+import json
+import math
+import sys
+from datetime import date, datetime, timedelta
+from typing import Any
+
+
+def parse_date(value: str) -> date:
+    return date.fromisoformat(value[:10])
+
+
+def is_working_day(d: date, working_days: set[int]) -> bool:
+    return d.weekday() in working_days
+
+
+def next_working_day(d: date, working_days: set[int]) -> date:
+    n = d + timedelta(days=1)
+    while not is_working_day(n, working_days):
+        n += timedelta(days=1)
+    return n
+
+
+def add_business_days(start: date, days: int, working_days: set[int]) -> date:
+    if days <= 1:
+        return start
+    current = start
+    remaining = days - 1
+    while remaining > 0:
+        current = next_working_day(current, working_days)
+        remaining -= 1
+    return current
+
+
+def duration_days(estimate_seconds: int, hours_per_day: int) -> int:
+    if estimate_seconds <= 0:
+        return 0
+    seconds_per_day = hours_per_day * 3600
+    return max(1, math.ceil(estimate_seconds / seconds_per_day))
+
+
+def sort_key(item: dict[str, Any]) -> tuple:
+    return (
+        item.get("epicPriorityRank", 999),
+        item.get("storyRank", 999),
+        item.get("created", ""),
+        item.get("key", ""),
+    )
+
+
+def classify_status(
+    due: date,
+    sprint_end: date,
+    today: date,
+    blocked: bool,
+    has_estimate: bool,
+) -> str:
+    if blocked:
+        return "blocked"
+    if not has_estimate:
+        return "at_risk"
+    risk_threshold = sprint_end
+    days_to_end = 0
+    d = today
+    while d < sprint_end:
+        d = next_working_day(d, {0, 1, 2, 3, 4}) if d >= today else d + timedelta(days=1)
+        days_to_end += 1
+        if days_to_end > 2:
+            break
+    if due > sprint_end:
+        return "delayed"
+    if due <= sprint_end:
+        # at_risk if due within ~2 business days of sprint end from today
+        bd_count = 0
+        cursor = today
+        while cursor <= sprint_end and bd_count < 3:
+            if cursor.weekday() in {0, 1, 2, 3, 4}:
+                bd_count += 1
+            cursor += timedelta(days=1)
+        if due >= sprint_end - timedelta(days=2):
+            return "at_risk"
+        if today > due:
+            return "delayed"
+        return "on_track"
+    return "on_track"
+
+
+def compute_schedule(data: dict[str, Any]) -> dict[str, Any]:
+    sprint_start = parse_date(data["sprintStart"])
+    sprint_end = parse_date(data["sprintEnd"])
+    today = parse_date(data.get("today", date.today().isoformat()))
+    hours_per_day = int(data.get("hoursPerDay", 8))
+    buffer_pct = float(data.get("integrationBufferPercent", 10))
+    working_days = set(data.get("workingDays", [0, 1, 2, 3, 4]))
+    items: list[dict[str, Any]] = data.get("items", [])
+
+    scheduled_keys: dict[str, dict[str, Any]] = {}
+    by_assignee: dict[str, list[dict[str, Any]]] = {}
+    unscheduled: list[dict[str, Any]] = []
+    violations: list[dict[str, Any]] = []
+
+    for item in items:
+        assignee = item.get("assignee") or "unassigned"
+        by_assignee.setdefault(assignee, []).append(item)
+
+    for assignee, queue in by_assignee.items():
+        queue.sort(key=sort_key)
+        prev_end: date | None = None
+
+        for item in queue:
+            est = int(item.get("estimateSeconds") or 0)
+            blocked = bool(item.get("blocked", False))
+            team = (item.get("team") or "").lower()
+
+            if est <= 0 and not blocked:
+                unscheduled.append({"key": item["key"], "reason": "missing_estimate"})
+                continue
+
+            dur = duration_days(est, hours_per_day)
+            if team in ("mobile", "frontend") and est > 0:
+                extra = math.ceil(dur * buffer_pct / 100)
+                dur += extra
+
+            start = sprint_start
+            if prev_end is not None:
+                start = max(start, next_working_day(prev_end, working_days))
+
+            for dep in item.get("dependencies") or []:
+                dep_key = dep.get("dependsOnKey")
+                if dep_key and dep_key in scheduled_keys:
+                    dep_due = parse_date(scheduled_keys[dep_key]["dueDate"])
+                    dep_start = next_working_day(dep_due, working_days)
+                    if start < dep_start:
+                        start = dep_start
+                elif dep_key:
+                    violations.append(
+                        {
+                            "key": item["key"],
+                            "issue": f"dependency {dep_key} not yet scheduled",
+                        }
+                    )
+
+            if not is_working_day(start, working_days):
+                while not is_working_day(start, working_days):
+                    start += timedelta(days=1)
+
+            due = add_business_days(start, dur, working_days) if dur > 0 else start
+            status = classify_status(due, sprint_end, today, blocked, est > 0)
+
+            notes = []
+            if team in ("mobile", "frontend") and buffer_pct > 0:
+                notes.append(f"{buffer_pct}% integration buffer applied")
+
+            entry = {
+                "key": item["key"],
+                "storyKey": item.get("storyKey"),
+                "epicKey": item.get("epicKey"),
+                "assignee": assignee,
+                "startDate": start.isoformat(),
+                "dueDate": due.isoformat(),
+                "durationDays": dur,
+                "status": status,
+                "dependencyNotes": notes,
+            }
+            scheduled_keys[item["key"]] = entry
+            prev_end = due
+
+    return {
+        "scheduled": list(scheduled_keys.values()),
+        "violations": violations,
+        "unscheduled": unscheduled,
+    }
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        data = json.load(sys.stdin)
+    else:
+        with open(sys.argv[1], encoding="utf-8") as f:
+            data = json.load(f)
+    result = compute_schedule(data)
+    json.dump(result, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+
+
+if __name__ == "__main__":
+    main()

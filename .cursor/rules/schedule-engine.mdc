@@ -1,0 +1,28 @@
+---
+description: Schedule calculation constants — must match scripts/schedule_engine.py
+alwaysApply: true
+---
+
+# Schedule Engine Constants
+
+Do not recalculate dates in prose; run `scripts/schedule_engine.py`.
+
+| Rule | Value |
+|------|-------|
+| Hours per day | 8 |
+| Working days | Mon–Fri |
+| Duration | `ceil(estimateSeconds / (hoursPerDay * 3600))`, min 1 if estimate > 0 |
+| Priority sort | Epic priority → story rank → created date |
+| Task priority | Inherit from parent Epic |
+| Integration buffer | 10% of Mobile/Web effort after BE delivery |
+| BE → Mobile/Web | Mobile/Web start ≥ BE due date |
+| BE → QA API work | QA API validation start ≥ BE due date |
+
+Effort source: sum `timeoriginalestimate` on Tasks/Sub-tasks per Story, assignee-wise.
+
+Status classification (post-engine):
+
+- **on_track**: due ≤ sprint end, not blocked
+- **at_risk**: due within 2 business days of sprint end, or missing estimates on story
+- **delayed**: due > sprint end, or overdue and not Done
+- **blocked**: Jira blocked status, blocker link, or impediment label

@@ -1,0 +1,130 @@
+# Engineering Manager workflow configuration
+# Fill projectKey (and optionally cloudId) before first live Jira run.
+
+jira:
+  cloudId: "ba5d328f-f4a3-4652-ba4d-aba5e33ecabd"
+  siteUrl: https://physicswallah001.atlassian.net
+  projectKey: "VP"             # Replace with your Jira project key
+  boardId: 189                  # Optional; for board-scoped queries
+  activeSprintJql: 'project = {projectKey} AND sprint in openSprints()'
+  sprintDiscovery:
+    autoDiscover: true           # use getJiraIssueTypeMetaWithFields if sprint field empty
+
+fields:
+  originalEstimate: timeoriginalestimate
+  sprint: customfield_10020      # Jira Cloud default; overwritten after auto-discovery
+
+scheduling:
+  hoursPerDay: 8
+  workingDays: [Mon, Tue, Wed, Thu, Fri]
+  # Python engine uses weekday ints: Mon=0 .. Sun=6
+  workingDayInts: [0, 1, 2, 3, 4]
+  timezone: Asia/Kolkata
+  integrationBufferPercent: 10
+
+teams:
+  backend: [backend, be, api]
+  frontend: [frontend, fe, web]
+  mobile: [mobile, ios, android]
+  qa: [qa, test, testing]
+
+priorityOrder:
+  - Highest
+  - High
+  - Medium
+  - Low
+  - Lowest
+
+statusPhaseMap:
+  "To Do": PRD Tech Discussion
+  "Tech Assessment": Tech Assessment
+  "In Progress": Development
+  "In Development": Development
+  "In Review": Development
+  "QA": QA Testing
+  "In QA": QA Testing
+  "Bug Fix": Bug fixes
+  "Pre-Prod": Pre-Prod Deployments
+  "UAT": Product UAT and Design Review
+  "Ready for Release": Ready for Release
+  Done: Ready for Release
+
+reporting:
+  outputDir: reports
+  filenamePattern: sprint-{date}.md
+
+# First segment before '|' in issue summary → team (case-insensitive: BE, be, Be, etc.)
+teamPrefixMapping:
+  qa:
+    aliases: [qa]
+  backend:
+    aliases: [be, backend, api, dag, ppadmin, admin]
+  frontend:
+    aliases: [web, website, frontend, frontent, fe]
+  mobile:
+    aliases: [mobile, app, android, ios]
+
+timeline:
+  hoursPerDay: 6
+  leaveTaskPrefixes:
+    planned: "Leave | Planned"
+    unplanned: "Leave | Unplanned"
+  sideDisplay:
+    backend: Backend
+    frontend: Web
+    mobile: Mobile
+    qa: QA
+    release: Release
+    other: Other
+    unknown: Other
+  # Task/Sub-task with recognized pipe prefix but no keyword rule → canonical row
+  defaultTaskByTeam:
+    backend: BE development
+    frontend: Web development
+    mobile: Mobile development
+  canonicalTasks:
+    - { name: PRD Tech Discussion, side: Release }
+    - { name: BE Assessment, side: Backend }
+    - { name: Web Assessment, side: Web }
+    - { name: Mobile Assessment, side: Mobile }
+    - { name: QA Test cases & planning, side: QA }
+    - { name: BE development, side: Backend }
+    - { name: Web development, side: Web }
+    - { name: Mobile development, side: Mobile }
+    - { name: QA backend (API Contract & Testing), side: Backend }
+    - { name: QA web/Mweb stage + Admin + Bug fixes, side: Web }
+    - { name: QA mobile stage + Admin + Bug fixes, side: Mobile }
+    - { name: BE bugs fixes, side: Backend }
+    - { name: Web bug fixes, side: Web }
+    - { name: Mobile bug fixes, side: Mobile }
+    - { name: UAT stage, side: QA }
+    - { name: QA web pre-prod, side: Web }
+    - { name: QA mobile pre-prod, side: Mobile }
+    - { name: UAT final, side: QA }
+    - { name: Ready for release, side: Release }
+    - { name: Go live date, side: Release }
+  mappingRules:
+    - { keywords: ["leave | planned"], task: null, leaveType: planned }
+    - { keywords: ["leave | unplanned"], task: null, leaveType: unplanned }
+    - { keywords: ["prd handover"], ["prd tech", "tech discussion"], task: PRD Tech Discussion }
+    - { keywords: ["be assessment", "backend assessment"], task: BE Assessment }
+    - { keywords: ["web assessment", "frontend assessment"], task: Web Assessment }
+    - { keywords: ["mobile assessment", "app assessment", "android assessment"], task: Mobile Assessment }
+    - { keywords: ["test cases", "test case", "qa test cases", "qa planning"], task: QA Test cases & planning }
+    - { keywords: ["qa backend", "api contract", "automation testing", "api contract &"], task: QA backend (API Contract & Testing) }
+    - { keywords: ["qa web", "qa mweb", "mweb stage", "admin + bug"], task: QA web/Mweb stage + Admin + Bug fixes }
+    - { keywords: ["qa mobile stage", "qa app stage"], task: QA mobile stage + Admin + Bug fixes }
+    - { keywords: ["qa web pre-prod", "web pre-prod", "qa pre-prod"], task: QA web pre-prod }
+    - { keywords: ["qa mobile pre-prod", "mobile pre-prod"], task: QA mobile pre-prod }
+    - { keywords: ["uat final"], ["uat prod"] task: UAT final }
+    - { keywords: ["uat stage", "uat"], task: UAT stage }
+    - { keywords: ["ready for release"], task: Ready for release }
+    - { keywords: ["go live"], task: Go live date }
+    - { keywords: ["be bug", "backend bug", "be bugs"], task: BE bugs fixes }
+    - { keywords: ["web bug", "frontend bug"], task: Web bug fixes }
+    - { keywords: ["mobile bug", "app bug", "android bug"], task: Mobile bug fixes }
+    - { keywords: ["test execution"], task: QA Test cases & planning }
+    - { keywords: ["be", "be development", "backend dev", "dag flow", "enhancement"], task: BE development }
+    - { keywords: ["web", "frontend dev"], task: Web development }
+    - { keywords: ["android", "mobile dev", "app", "ios"], task: Mobile development }
+    - { keywords: ["bug", "defect"], task: null, useTeamBugRow: true }

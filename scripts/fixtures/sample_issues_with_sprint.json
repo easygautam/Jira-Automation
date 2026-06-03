@@ -1,0 +1,41 @@
+[
+  {
+    "key": "VP-1",
+    "fields": {
+      "summary": "Sample epic",
+      "issuetype": { "name": "Epic" },
+      "customfield_10020": [
+        {
+          "id": 999,
+          "name": "VP Sprint 10",
+          "state": "closed",
+          "startDate": "2026-05-01T00:00:00.000Z",
+          "endDate": "2026-05-14T00:00:00.000Z"
+        },
+        {
+          "id": 1000,
+          "name": "VP Sprint 11",
+          "state": "active",
+          "startDate": "2026-05-26T00:00:00.000Z",
+          "endDate": "2026-06-09T00:00:00.000Z"
+        }
+      ]
+    }
+  },
+  {
+    "key": "VP-2",
+    "fields": {
+      "summary": "Task",
+      "issuetype": { "name": "Task" },
+      "customfield_10020": [
+        {
+          "id": 1000,
+          "name": "VP Sprint 11",
+          "state": "active",
+          "startDate": "2026-05-26T00:00:00.000Z",
+          "endDate": "2026-06-09T00:00:00.000Z"
+        }
+      ]
+    }
+  }
+]

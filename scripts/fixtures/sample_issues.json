@@ -1,0 +1,98 @@
+[
+  {
+    "key": "PROJ-1",
+    "fields": {
+      "summary": "User onboarding epic",
+      "issuetype": { "name": "Epic", "hierarchyLevel": 1 },
+      "priority": { "name": "High" },
+      "status": { "name": "In Progress" },
+      "assignee": { "displayName": "EM Lead", "accountId": "em1" },
+      "labels": [],
+      "components": [],
+      "created": "2026-05-20T09:00:00.000Z"
+    }
+  },
+  {
+    "key": "PROJ-10",
+    "fields": {
+      "summary": "Backend onboarding API",
+      "issuetype": { "name": "Story" },
+      "priority": { "name": "High" },
+      "status": { "name": "In Progress" },
+      "parent": { "key": "PROJ-1" },
+      "assignee": { "displayName": "Alice BE", "accountId": "alice" },
+      "labels": ["backend"],
+      "components": [],
+      "created": "2026-05-21T09:00:00.000Z"
+    }
+  },
+  {
+    "key": "PROJ-11",
+    "fields": {
+      "summary": "Mobile onboarding UI",
+      "issuetype": { "name": "Story" },
+      "priority": { "name": "High" },
+      "status": { "name": "To Do" },
+      "parent": { "key": "PROJ-1" },
+      "assignee": { "displayName": "Bob Mobile", "accountId": "bob" },
+      "labels": ["mobile"],
+      "components": [],
+      "created": "2026-05-22T09:00:00.000Z"
+    }
+  },
+  {
+    "key": "PROJ-50",
+    "fields": {
+      "summary": "Implement auth API",
+      "issuetype": { "name": "Task" },
+      "status": { "name": "In Progress" },
+      "parent": { "key": "PROJ-10" },
+      "assignee": { "displayName": "Alice BE", "accountId": "alice" },
+      "timeoriginalestimate": 57600,
+      "labels": ["backend"],
+      "components": [],
+      "created": "2026-05-23T09:00:00.000Z"
+    }
+  },
+  {
+    "key": "PROJ-51",
+    "fields": {
+      "summary": "QA API test cases",
+      "issuetype": { "name": "Task" },
+      "status": { "name": "To Do" },
+      "parent": { "key": "PROJ-10" },
+      "assignee": { "displayName": "Carol QA", "accountId": "carol" },
+      "timeoriginalestimate": 28800,
+      "labels": ["qa"],
+      "components": [],
+      "created": "2026-05-24T09:00:00.000Z"
+    }
+  },
+  {
+    "key": "PROJ-60",
+    "fields": {
+      "summary": "Build login screen",
+      "issuetype": { "name": "Task" },
+      "status": { "name": "To Do" },
+      "parent": { "key": "PROJ-11" },
+      "assignee": { "displayName": "Bob Mobile", "accountId": "bob" },
+      "timeoriginalestimate": 28800,
+      "labels": ["mobile"],
+      "components": [],
+      "created": "2026-05-25T09:00:00.000Z"
+    }
+  },
+  {
+    "key": "PROJ-99",
+    "fields": {
+      "summary": "Missing estimate task",
+      "issuetype": { "name": "Task" },
+      "status": { "name": "To Do" },
+      "parent": { "key": "PROJ-11" },
+      "assignee": { "displayName": "Bob Mobile", "accountId": "bob" },
+      "labels": ["mobile"],
+      "components": [],
+      "created": "2026-05-26T09:00:00.000Z"
+    }
+  }
+]

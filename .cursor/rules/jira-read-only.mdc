@@ -1,0 +1,25 @@
+---
+description: Read-only Jira access — no writes unless user explicitly overrides
+alwaysApply: true
+---
+
+# Jira Read-Only
+
+This workflow has **read-only** access to Jira by default.
+
+## Allowed
+
+- Atlassian MCP read tools: `searchJiraIssuesUsingJql`, `getJiraIssue`, `getAccessibleAtlassianResources`, etc.
+- GET requests to Jira REST / Agile APIs in custom scripts
+
+## Forbidden (unless user explicitly requests write-back)
+
+- `createJiraIssue`, `editJiraIssue`, `transitionJiraIssue`
+- `addCommentToJiraIssue`, `addWorklogToJiraIssue`, `createIssueLink`
+- POST / PUT / PATCH / DELETE to Jira endpoints
+
+## If asked to update Jira
+
+1. Refuse by default and cite this rule
+2. Offer read-only alternative: local report with recommended due dates
+3. Only proceed with writes if user explicitly overrides for a specific action
