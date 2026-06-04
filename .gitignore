@@ -1,3 +1,5 @@
+.DS_Store
+
 # Generated reports and pipeline temp (keep repo lean for agents)
 reports/sprint-*.md
 reports/timeline-breakdown-*.md

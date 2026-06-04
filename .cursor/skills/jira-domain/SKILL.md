@@ -9,6 +9,10 @@ disable-model-invocation: true
 
 # Jira Domain
 
+## Team Jira guide
+
+Human-readable naming and estimate rules: [`docs/JIRA-BEST-PRACTICES.md`](../../docs/JIRA-BEST-PRACTICES.md).
+
 ## Hierarchy
 
 Epic (priority source) → Story → Task / Sub-task (estimate + assignee). Walk `parent` until Epic.

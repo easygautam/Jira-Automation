@@ -19,6 +19,7 @@ Team prefixes: `scripts/jira_teams.py` + `em-config.yaml` `teamPrefixMapping` (f
 
 ## Config & entrypoints
 
+- Jira title/estimate guide for teams: [`docs/JIRA-BEST-PRACTICES.md`](../docs/JIRA-BEST-PRACTICES.md)
 - Config: `.cursor/config/em-config.yaml`
 - Commands: `sprint-report`, `recalculate-schedule`, `daily-standup`, `improve-workflow` → matching skill under `.cursor/skills/`
 - Rules: `em-workflow.mdc`, `schedule-engine.mdc`, `jira-read-only.mdc`
