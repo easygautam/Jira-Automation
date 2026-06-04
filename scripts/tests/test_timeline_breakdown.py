@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -11,6 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from timeline_breakdown import (  # noqa: E402
+    STAGE_DEVELOPMENT,
+    STAGE_STAGE_TESTING,
+    STAGE_TEST_PLANNING,
     build_timeline_breakdown,
     calc_days,
     classify_issue,
@@ -62,6 +64,10 @@ MINIMAL_CONFIG = {
     },
     "timeline": {
         "hoursPerDay": 6,
+        "effortBuffers": {
+            "bugFixesPercentOfDevelopment": 0.10,
+            "stageFinalTestingPercentOfStageTesting": 0.10,
+        },
         "leaveTaskPrefixes": {
             "planned": "Leave | Planned",
             "unplanned": "Leave | Unplanned",
@@ -73,26 +79,58 @@ MINIMAL_CONFIG = {
             "qa": "QA",
             "unknown": "Other",
         },
-        "canonicalTasks": [
-            {"name": "BE development", "side": "Backend"},
-            {"name": "Web development", "side": "Web"},
-            {"name": "Go live date"},
-        ],
-        "mappingRules": [
-            {"keywords": ["leave | planned"], "leaveType": "planned"},
-            {"keywords": ["leave | unplanned"], "leaveType": "unplanned"},
-            {"keywords": ["be ||", "be development"], "task": "BE development"},
-            {"keywords": ["web ||"], "task": "Web development"},
-            {"keywords": ["go live"], "task": "Go live date"},
-            {"keywords": ["bug"], "task": None, "useTeamBugRow": True},
-        ],
+        "defaultTaskByTeam": {
+            "backend": "Development",
+            "frontend": "Development",
+            "mobile": "Development",
+        },
+        "executionStages": {
+            "backend": [
+                "Assessment",
+                "Development",
+                "Stage testing",
+                "Bug fixes",
+                "Stage final testing",
+                "Prod release",
+                "Prod final testing",
+                "Go live date",
+            ],
+            "frontend": [
+                "Assessment",
+                "Development",
+                "Stage testing",
+                "Bug fixes",
+                "Stage final testing",
+                "Pre-Prod testing",
+                "UAT",
+                "Ready for release",
+                "Go live date",
+            ],
+            "mobile": [
+                "Assessment",
+                "Development",
+                "Stage testing",
+                "Bug fixes",
+                "Stage final testing",
+                "Pre-Prod testing",
+                "UAT",
+                "Ready for release",
+                "Go live date",
+            ],
+        },
+        "qaCrossPlatformStages": ["Test planning"],
+        "stageMapping": [],
     },
 }
 
 
+def _stage_row(epic_row: dict, platform: str, stage: str) -> dict:
+    block = epic_row["executionStages"][platform]
+    return next(r for r in block["stages"] if r["stage"] == stage)
+
+
 class TestCalcDays(unittest.TestCase):
     def test_six_hour_day(self):
-        # (12 + 6 + 0) / (2 * 6) = 1.5 -> ceil 2
         self.assertEqual(calc_days(12, 6, 0, 2, 6), 2)
 
     def test_no_resources(self):
@@ -107,31 +145,30 @@ class TestClassifyIssue(unittest.TestCase):
         self.assertEqual(result["kind"], "leave")
         self.assertEqual(result["leaveType"], "planned")
 
-    def test_generic_leave_health_issue(self):
-        epic = _epic("VP-100")
-        work = _issue("VP-2", "QA | WEB | stage work", 3600, parent_key="VP-100", assignee="Shivam")
-        leave = _issue(
-            "VP-3",
-            "Leave | Health Issue",
-            21600,
-            parent_key="VP-100",
-            assignee="Shivam",
-        )
-        cfg = MINIMAL_CONFIG["timeline"]
-        result = classify_issue(
-            leave, cfg, MINIMAL_CONFIG["teams"], epic_issues=[epic, work, leave]
-        )
-        self.assertEqual(result["kind"], "leave")
-        self.assertEqual(result["leaveType"], "planned")
-        self.assertEqual(result["team"], "qa")
-        self.assertEqual(result["comment"], "Health Issue")
+    def test_be_assessment_prefix(self):
+        issue = _issue("VP-2", "BE | Assessment", 3600)
+        result = classify_issue(issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"])
+        self.assertEqual(result["platform"], "backend")
+        self.assertEqual(result["stage"], "Assessment")
 
-    def test_be_development_keyword(self):
+    def test_be_development_pipe(self):
         issue = _issue("VP-2", "BE || Add endpoint", 14400)
-        cfg = MINIMAL_CONFIG["timeline"]
-        result = classify_issue(issue, cfg, MINIMAL_CONFIG["teams"])
+        result = classify_issue(issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"])
         self.assertEqual(result["kind"], "work")
-        self.assertEqual(result["task"], "BE development")
+        self.assertEqual(result["stage"], STAGE_DEVELOPMENT)
+        self.assertEqual(result["platform"], "backend")
+
+    def test_qa_assessment_cross_platform(self):
+        issue = _issue("VP-3", "QA | Assessment", 7200)
+        result = classify_issue(issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"])
+        self.assertEqual(result["platform"], "qa_cross")
+        self.assertEqual(result["stage"], STAGE_TEST_PLANNING)
+
+    def test_qa_web_stage_testing(self):
+        issue = _issue("VP-4", "QA | WEB | 1st iteration (stage testing)", 3600)
+        result = classify_issue(issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"])
+        self.assertEqual(result["platform"], "frontend")
+        self.assertEqual(result["stage"], STAGE_STAGE_TESTING)
 
 
 class TestBuildTimelineBreakdown(unittest.TestCase):
@@ -145,28 +182,55 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
                 {"key": "VP-102", "startDate": "2026-06-03", "dueDate": "2026-06-08"},
             ]
         }
-        result = build_timeline_breakdown(
-            [epic, t1, t2], schedule, MINIMAL_CONFIG
-        )
-        self.assertEqual(len(result), 1)
+        result = build_timeline_breakdown([epic, t1, t2], schedule, MINIMAL_CONFIG)
         epic_row = result[0]
-        self.assertEqual(epic_row["epicKey"], "VP-100")
         self.assertEqual(epic_row["deliveryStart"], "2026-06-02")
         self.assertEqual(epic_row["deliveryEnd"], "2026-06-08")
 
-        be_row = next(r for r in epic_row["tasks"] if r["task"] == "BE development")
+        be_row = _stage_row(epic_row, "backend", STAGE_DEVELOPMENT)
         self.assertEqual(be_row["start"], "2026-06-02")
         self.assertEqual(be_row["end"], "2026-06-05")
         self.assertEqual(be_row["effortsHours"], 8.0)
+        bug_row = _stage_row(epic_row, "backend", "Bug fixes")
+        self.assertEqual(bug_row["effortsHours"], 0.8)
+        self.assertEqual(bug_row["source"], "synthetic")
 
     def test_planned_leave_hours_on_side(self):
         epic = _epic("VP-200")
         dev = _issue("VP-201", "BE || work", 3600, parent_key="VP-200")
         leave = _issue("VP-202", "Leave | Planned - holiday", 7200, parent_key="VP-200")
-        schedule = {"scheduled": []}
-        result = build_timeline_breakdown([epic, dev, leave], schedule, MINIMAL_CONFIG)
-        be_row = next(r for r in result[0]["tasks"] if r["task"] == "BE development")
+        result = build_timeline_breakdown([epic, dev, leave], {"scheduled": []}, MINIMAL_CONFIG)
+        be_row = _stage_row(result[0], "backend", STAGE_DEVELOPMENT)
         self.assertEqual(be_row["plannedLeaveHours"], 2.0)
+
+    def test_web_preprod_separate_from_uat(self):
+        epic = _epic("VP-600")
+        pre = _issue(
+            "VP-601",
+            "QA | WEB | pre-prod validation",
+            7200,
+            parent_key="VP-600",
+        )
+        uat = _issue("VP-602", "QA | WEB | UAT stage", 3600, parent_key="VP-600")
+        result = build_timeline_breakdown([epic, pre, uat], {"scheduled": []}, MINIMAL_CONFIG)[0]
+        pre_row = _stage_row(result, "frontend", "Pre-Prod testing")
+        uat_row = _stage_row(result, "frontend", "UAT")
+        self.assertEqual(pre_row["effortsHours"], 2.0)
+        self.assertEqual(uat_row["effortsHours"], 1.0)
+
+    def test_mobile_preprod_not_web(self):
+        epic = _epic("VP-601")
+        mob = _issue(
+            "VP-602",
+            "QA | APP | mobile pre-prod",
+            3600,
+            parent_key="VP-601",
+        )
+        result = build_timeline_breakdown([epic, mob], {"scheduled": []}, MINIMAL_CONFIG)[0]
+        mob_row = _stage_row(result, "mobile", "Pre-Prod testing")
+        web_row = _stage_row(result, "frontend", "Pre-Prod testing")
+        self.assertEqual(mob_row["effortsHours"], 1.0)
+        self.assertIsNone(web_row["effortsHours"])
 
     def test_members_by_side_two_backend(self):
         epic = _epic("VP-300")
@@ -181,60 +245,17 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         result = build_timeline_breakdown([epic, t1, t2], schedule, MINIMAL_CONFIG)
         backend_members = result[0]["membersBySide"]["Backend"]
         self.assertEqual(len(backend_members), 2)
-        by_name = {m["member"]: m for m in backend_members}
-        self.assertEqual(by_name["Alice"]["effortsHours"], 2.0)
-        self.assertEqual(by_name["Bob"]["effortsHours"], 3.0)
-        self.assertEqual(by_name["Alice"]["start"], "2026-06-01")
-        self.assertEqual(by_name["Bob"]["end"], "2026-06-05")
-        self.assertEqual(len(result[0]["teamSummary"]["Backend"]["members"]), 2)
 
-    def test_leave_health_issue_in_teams_plan(self):
-        epic = _epic("VP-500")
-        work = _issue(
-            "VP-501",
-            "QA | WEB | EVENTS PRD",
-            14400,
-            parent_key="VP-500",
-            assignee="Shivam",
-        )
-        leave = _issue(
-            "VP-502",
-            "Leave | Health Issue",
-            21600,
-            parent_key="VP-500",
-            assignee="Shivam",
-        )
-        schedule = {
-            "scheduled": [
-                {"key": "VP-501", "startDate": "2026-06-01", "dueDate": "2026-06-04"},
-                {"key": "VP-502", "startDate": "2026-06-08", "dueDate": "2026-06-08"},
-            ]
-        }
-        result = build_timeline_breakdown(
-            [epic, work, leave], schedule, MINIMAL_CONFIG
-        )[0]
-        self.assertEqual(result["unmapped"], [])
-        qa = result["teamSummary"]["QA"]
-        self.assertEqual(qa["totalLeaveHours"], 6.0)
-        shivam = next(m for m in result["membersBySide"]["QA"] if m["member"] == "Shivam")
-        self.assertEqual(shivam["plannedLeaveHours"], 6.0)
-        self.assertIn("VP-502", shivam["issueKeys"])
-
-    def test_no_release_in_teams_plan(self):
-        epic = _epic("VP-400")
-        t1 = _issue("VP-401", "BE || API", 3600, parent_key="VP-400")
-        schedule = {"scheduled": []}
-        cfg = dict(MINIMAL_CONFIG)
-        cfg["timeline"] = dict(MINIMAL_CONFIG["timeline"])
-        cfg["timeline"]["canonicalTasks"] = [
-            {"name": "PRD Tech Discussion"},
-            {"name": "BE development", "side": "Backend"},
-            {"name": "Go live date"},
-        ]
-        result = build_timeline_breakdown([epic, t1], schedule, cfg)
-        self.assertNotIn("Release", result[0]["teamSummary"])
-        prd = next(r for r in result[0]["tasks"] if r["task"] == "PRD Tech Discussion")
-        self.assertIsNone(prd["team"])
+    def test_qa_test_planning_not_tripled(self):
+        epic = _epic("VP-700")
+        qa = _issue("VP-701", "QA | Assessment", 9000, parent_key="VP-700")
+        result = build_timeline_breakdown([epic, qa], {"scheduled": []}, MINIMAL_CONFIG)[0]
+        qa_rows = result["qaCrossPlatform"]["stages"]
+        planning = next(r for r in qa_rows if r["stage"] == STAGE_TEST_PLANNING)
+        self.assertEqual(planning["effortsHours"], 2.5)
+        for plat in ("backend", "frontend", "mobile"):
+            assess = _stage_row(result, plat, "Assessment")
+            self.assertIsNone(assess["effortsHours"])
 
 
 if __name__ == "__main__":

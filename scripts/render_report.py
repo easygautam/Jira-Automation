@@ -282,16 +282,28 @@ def render_timeline_sections(
         epic_link = jira_issue_link(jira_site_url, epic_key)
         d_start = _fmt_date(epic.get("deliveryStart"))
         d_end = _fmt_date(epic.get("deliveryEnd"))
-        go_live = _fmt_date(epic.get("goLive"))
         cal_days = epic.get("calendarDeliveryDays")
         cal_s = f" | Calendar days: {cal_days}" if cal_days else ""
 
         lines.append(f'<span id="{epic_prd_anchor(epic_key)}"></span>')
         lines.append("")
         lines.append(f"### {epic_link} — {prd}")
-        lines.append(
-            f"- Delivery window: {d_start} → {d_end} | Go live: {go_live}{cal_s}"
-        )
+        lines.append(f"- Epic delivery window: {d_start} → {d_end}{cal_s}")
+        exec_stages = epic.get("executionStages") or {}
+        for plat_key, label in (
+            ("backend", "Backend"),
+            ("frontend", "Web"),
+            ("mobile", "Mobile"),
+        ):
+            block = exec_stages.get(plat_key)
+            if not block:
+                continue
+            p_start = _fmt_date(block.get("deliveryStart"))
+            p_end = _fmt_date(block.get("deliveryEnd"))
+            p_go = _fmt_date(block.get("goLive"))
+            lines.append(
+                f"- **{label}** platform: {p_start} → {p_end} | Go live: {p_go}"
+            )
         lines.append("")
         lines.append("#### Teams plan")
         lines.append("")
@@ -350,28 +362,70 @@ def render_timeline_sections(
                     f"{escape_md_cell(issues_s)} | {tasks_s} |"
                 )
         lines.append("")
-        lines.append("#### Task breakdown")
+        lines.append("#### Execution stages")
         lines.append("")
-        lines.append(
-            "| Task | Side | Resources | Efforts (h) | Leave (h) | Delay (h) | "
+        stage_header = (
+            "| Stage | Resources | Efforts (h) | Leave (h) | Delay (h) | "
             "Start | End | Calc days |"
         )
-        lines.append(
-            "|------|------|-----------|-------------|-----------|-----------|"
+        stage_sep = (
+            "|-------|-----------|-------------|-----------|-----------|"
             "-------|-----|-----------|"
         )
-        for row in epic.get("tasks") or []:
-            calc = row.get("calculatedDays")
-            calc_s = str(calc) if calc is not None else "—"
-            lines.append(
-                f"| {escape_md_cell(row.get('task', ''))} | {row.get('team') or '—'} | "
-                f"{_fmt_resources(row.get('resources'))} | "
-                f"{_fmt_hours(row.get('effortsHours'))} | "
-                f"{_fmt_hours(row.get('plannedLeaveHours'))} | "
-                f"{_fmt_hours(row.get('unplannedDelayHours'))} | "
-                f"{_fmt_date(row.get('start'))} | {_fmt_date(row.get('end'))} | {calc_s} |"
-            )
-        lines.append("")
+
+        def _render_stage_table(stage_rows: list[dict[str, Any]]) -> None:
+            lines.append(stage_header)
+            lines.append(stage_sep)
+            for row in stage_rows:
+                calc = row.get("calculatedDays")
+                calc_s = str(calc) if calc is not None else "—"
+                src = row.get("source")
+                stage_label = row.get("stage", "")
+                if src == "synthetic":
+                    stage_label = f"{stage_label} (est.)"
+                lines.append(
+                    f"| {escape_md_cell(stage_label)} | "
+                    f"{_fmt_resources(row.get('resources'))} | "
+                    f"{_fmt_hours(row.get('effortsHours'))} | "
+                    f"{_fmt_hours(row.get('plannedLeaveHours'))} | "
+                    f"{_fmt_hours(row.get('unplannedDelayHours'))} | "
+                    f"{_fmt_date(row.get('start'))} | {_fmt_date(row.get('end'))} | {calc_s} |"
+                )
+            lines.append("")
+
+        if exec_stages:
+            for plat_key, label in (
+                ("backend", "Backend"),
+                ("frontend", "Web"),
+                ("mobile", "Mobile"),
+            ):
+                block = exec_stages.get(plat_key)
+                if not block or not block.get("stages"):
+                    continue
+                lines.append(f"**{label}**")
+                lines.append("")
+                _render_stage_table(block["stages"])
+            qa_x = epic.get("qaCrossPlatform") or {}
+            qa_rows = qa_x.get("stages") or []
+            if qa_rows and any(r.get("effortsHours") for r in qa_rows):
+                lines.append("**QA (all platforms)**")
+                lines.append("")
+                _render_stage_table(qa_rows)
+        else:
+            lines.append(stage_header)
+            lines.append(stage_sep)
+            for row in epic.get("tasks") or []:
+                calc = row.get("calculatedDays")
+                calc_s = str(calc) if calc is not None else "—"
+                lines.append(
+                    f"| {escape_md_cell(row.get('task', ''))} | "
+                    f"{_fmt_resources(row.get('resources'))} | "
+                    f"{_fmt_hours(row.get('effortsHours'))} | "
+                    f"{_fmt_hours(row.get('plannedLeaveHours'))} | "
+                    f"{_fmt_hours(row.get('unplannedDelayHours'))} | "
+                    f"{_fmt_date(row.get('start'))} | {_fmt_date(row.get('end'))} | {calc_s} |"
+                )
+            lines.append("")
 
         unmapped = epic.get("unmapped") or []
         if unmapped:

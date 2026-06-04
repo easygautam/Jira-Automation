@@ -36,14 +36,17 @@ CONFIG = {
     "timeline": {
         "leaveTaskPrefixes": {"planned": "Leave | Planned", "unplanned": "Leave | Unplanned"},
         "defaultTaskByTeam": {
-            "backend": "BE development",
-            "frontend": "Web development",
-            "mobile": "Mobile development",
+            "backend": "Development",
+            "frontend": "Development",
+            "mobile": "Development",
         },
-        "mappingRules": [
-            {"keywords": ["android", "app |"], "task": "Mobile development"},
-            {"keywords": ["qa |"], "task": "QA Test cases & planning"},
-        ],
+        "executionStages": {
+            "backend": ["Development", "Stage testing"],
+            "frontend": ["Development", "Stage testing"],
+            "mobile": ["Development", "Stage testing"],
+        },
+        "qaCrossPlatformStages": ["Test planning"],
+        "stageMapping": [],
     },
 }
 
@@ -113,7 +116,7 @@ class TestPipePrefix(unittest.TestCase):
         result = classify_issue(issue, CONFIG["timeline"], CONFIG["teams"], CONFIG)
         self.assertEqual(result["kind"], "work")
         self.assertEqual(result["team"], "backend")
-        self.assertEqual(result["task"], "BE development")
+        self.assertEqual(result["stage"], "Development")
 
     def test_qa_classified_as_qa_work_not_mobile(self):
         issue = _issue(
@@ -122,7 +125,8 @@ class TestPipePrefix(unittest.TestCase):
         )
         result = classify_issue(issue, CONFIG["timeline"], CONFIG["teams"], CONFIG)
         self.assertEqual(result["team"], "qa")
-        self.assertIn("QA mobile stage", result["task"])
+        self.assertEqual(result["stage"], "Stage testing")
+        self.assertEqual(result["platform"], "mobile")
 
 
 if __name__ == "__main__":

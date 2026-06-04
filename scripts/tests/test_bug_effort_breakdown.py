@@ -59,11 +59,14 @@ CONFIG = {
         "hoursPerDay": 6,
         "leaveTaskPrefixes": {"planned": "Leave | Planned", "unplanned": "Leave | Unplanned"},
         "sideDisplay": {"backend": "Backend", "frontend": "Web", "unknown": "Other"},
-        "canonicalTasks": [{"name": "BE development", "side": "Backend"}],
-        "mappingRules": [
-            {"keywords": ["be ||"], "task": "BE development"},
-            {"keywords": ["bug"], "task": None, "useTeamBugRow": True},
-        ],
+        "defaultTaskByTeam": {"backend": "Development"},
+        "executionStages": {
+            "backend": ["Development"],
+            "frontend": ["Development"],
+            "mobile": ["Development"],
+        },
+        "qaCrossPlatformStages": ["Test planning"],
+        "stageMapping": [],
     },
 }
 
@@ -94,7 +97,11 @@ class TestTimelineTaskOnly(unittest.TestCase):
         result = build_timeline_breakdown(
             [epic, task, bug, te], {"scheduled": []}, CONFIG
         )
-        be = next(r for r in result[0]["tasks"] if r["task"] == "BE development")
+        be = next(
+            r
+            for r in result[0]["executionStages"]["backend"]["stages"]
+            if r["stage"] == "Development"
+        )
         self.assertEqual(be["effortsHours"], 2.0)
 
 

@@ -28,14 +28,65 @@ from jira_normalize import (
 )
 from jira_teams import (
     TEAM_OTHER,
-    mapping_rule_applies,
-    qa_work_stream,
+    assessment_target,
+    qa_platform_stream,
+    stage_mapping_rule_applies,
     task_from_pipe_prefix_team,
     team_from_issue,
 )
 
-# Engineering teams only — milestone rows (no side) stay in Task breakdown, not Teams plan.
 TEAM_PLAN_SIDES = ("Backend", "Web", "Mobile", "QA", "Other")
+PLATFORM_KEYS = ("backend", "frontend", "mobile")
+PLATFORM_SIDE = {"backend": "Backend", "frontend": "Web", "mobile": "Mobile"}
+QA_CROSS = "qa_cross"
+
+STAGE_TEST_PLANNING = "Test planning"
+STAGE_ASSESSMENT = "Assessment"
+STAGE_DEVELOPMENT = "Development"
+STAGE_STAGE_TESTING = "Stage testing"
+STAGE_BUG_FIXES = "Bug fixes"
+STAGE_STAGE_FINAL_TESTING = "Stage final testing"
+STAGE_PROD_RELEASE = "Prod release"
+STAGE_PROD_FINAL_TESTING = "Prod final testing"
+STAGE_PREPROD = "Pre-Prod testing"
+STAGE_UAT = "UAT"
+STAGE_READY = "Ready for release"
+STAGE_GO_LIVE = "Go live date"
+
+DEFAULT_EXECUTION_STAGES: dict[str, list[str]] = {
+    "backend": [
+        STAGE_ASSESSMENT,
+        STAGE_DEVELOPMENT,
+        STAGE_STAGE_TESTING,
+        STAGE_BUG_FIXES,
+        STAGE_STAGE_FINAL_TESTING,
+        STAGE_PROD_RELEASE,
+        STAGE_PROD_FINAL_TESTING,
+        STAGE_GO_LIVE,
+    ],
+    "frontend": [
+        STAGE_ASSESSMENT,
+        STAGE_DEVELOPMENT,
+        STAGE_STAGE_TESTING,
+        STAGE_BUG_FIXES,
+        STAGE_STAGE_FINAL_TESTING,
+        STAGE_PREPROD,
+        STAGE_UAT,
+        STAGE_READY,
+        STAGE_GO_LIVE,
+    ],
+    "mobile": [
+        STAGE_ASSESSMENT,
+        STAGE_DEVELOPMENT,
+        STAGE_STAGE_TESTING,
+        STAGE_BUG_FIXES,
+        STAGE_STAGE_FINAL_TESTING,
+        STAGE_PREPROD,
+        STAGE_UAT,
+        STAGE_READY,
+        STAGE_GO_LIVE,
+    ],
+}
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -46,7 +97,6 @@ def load_config(path: Path) -> dict[str, Any]:
 
 
 def is_task_or_subtask(issue: dict[str, Any]) -> bool:
-    """Timeline effort counts only Task and Sub-task issue types."""
     itype = issue_type_name(issue)
     return itype in ("task", "sub-task", "subtask")
 
@@ -57,16 +107,10 @@ def side_display(team: str, side_display_map: dict[str, str]) -> str:
     return side_display_map.get(team, side_display_map.get("other", "Other"))
 
 
-def canonical_side(
-    ct: dict[str, Any], side_display_map: dict[str, str]
-) -> str | None:
-    """Team for canonical row; None = milestone (excluded from Teams plan)."""
-    raw = ct.get("side")
-    if raw is None or raw == "" or str(raw).lower() == "release":
-        return None
-    if raw in TEAM_PLAN_SIDES:
-        return raw
-    return side_display(str(raw).lower(), side_display_map)
+def platform_side(platform: str, side_display_map: dict[str, str]) -> str:
+    if platform == QA_CROSS:
+        return side_display_map.get("qa", "QA")
+    return PLATFORM_SIDE.get(platform, side_display_map.get("other", "Other"))
 
 
 def assignee_name(issue: dict[str, Any]) -> str:
@@ -87,7 +131,7 @@ def bump_member(
     start: str | None = None,
     end: str | None = None,
     issue_key: str | None = None,
-    task_name: str | None = None,
+    stage_name: str | None = None,
 ) -> None:
     key = (side, member)
     if key not in member_stats:
@@ -110,8 +154,8 @@ def bump_member(
         row["ends"].append(end)
     if issue_key:
         row["issueKeys"].append(issue_key)
-    if task_name:
-        row["canonicalTasks"].add(task_name)
+    if stage_name:
+        row["canonicalTasks"].add(stage_name)
 
 
 def build_members_by_side(
@@ -179,7 +223,6 @@ def resolve_leave_team(
     teams_cfg: dict[str, list[str]],
     config: dict[str, Any] | None,
 ) -> str:
-    """Leave | * titles use assignee's delivery team from other work on the same epic."""
     team = team_from_issue(issue, teams_cfg, config)
     if team != TEAM_OTHER:
         return team
@@ -199,6 +242,80 @@ def resolve_leave_team(
     return team
 
 
+def _empty_stage_bucket() -> dict[str, Any]:
+    return {
+        "effortsHours": 0.0,
+        "plannedLeaveHours": 0.0,
+        "unplannedDelayHours": 0.0,
+        "resources": set(),
+        "starts": [],
+        "ends": [],
+        "issueKeys": [],
+        "source": None,
+        "leaveComments": [],
+    }
+
+
+def _init_platform_buckets(stage_names: list[str]) -> dict[str, dict[str, Any]]:
+    return {name: _empty_stage_bucket() for name in stage_names}
+
+
+def _match_config_stage(
+    stage_mapping: list[dict[str, Any]],
+    platform: str,
+    summary: str,
+) -> str | None:
+    for rule in stage_mapping:
+        if rule.get("platform") != platform:
+            continue
+        if stage_mapping_rule_applies(rule, summary):
+            return rule.get("stage")
+    return None
+
+
+def _is_stage_testing_qa(summary: str) -> bool:
+    lower = summary.lower()
+    if "pre-prod" in lower or "pre prod" in lower:
+        return False
+    if "ready for release" in lower:
+        return False
+    markers = (
+        "1st iteration",
+        "2nd iteration",
+        "iteration",
+        "stage testing",
+        "mweb stage",
+        "admin + bug",
+        "api contract",
+        "automation testing",
+    )
+    return any(m in lower for m in markers)
+
+
+def _qa_scoped_release_stage(summary: str, platform: str) -> str | None:
+    lower = summary.lower()
+    if "ready for release" in lower:
+        return STAGE_READY
+    if ("uat" in lower or "uat stage" in lower) and "pre-prod" not in lower and "pre prod" not in lower:
+        if "prod final" in lower or "uat prod" in lower:
+            return None
+        return STAGE_UAT
+    if "pre-prod" in lower or "pre prod" in lower:
+        return STAGE_PREPROD
+    return None
+
+
+def _backend_prod_stage(summary: str) -> str | None:
+    lower = summary.lower()
+    if any(k in lower for k in ("prod final", "production final", "uat prod")):
+        return STAGE_PROD_FINAL_TESTING
+    if any(k in lower for k in ("prod release", "production release")):
+        if "prod final" in lower or "final testing" in lower:
+            return None
+        return STAGE_PROD_RELEASE
+    return None
+
+
 def classify_issue(
     issue: dict[str, Any],
     timeline_cfg: dict[str, Any],
@@ -212,100 +329,182 @@ def classify_issue(
     planned_p = (prefixes.get("planned") or "Leave | Planned").lower()
     unplanned_p = (prefixes.get("unplanned") or "Leave | Unplanned").lower()
     generic_p = (prefixes.get("generic") or "Leave |").lower()
+    stage_mapping = timeline_cfg.get("stageMapping") or []
 
-    def _leave_result(leave_type: str, prefix_key: str, prefix_len: int) -> dict[str, Any]:
-        team = resolve_leave_team(
-            issue, epic_issues or [], teams_cfg, config
-        )
+    def _work(platform: str, stage: str, team: str) -> dict[str, Any]:
+        return {
+            "kind": "work",
+            "platform": platform,
+            "stage": stage,
+            "team": team,
+            "issueKey": issue.get("key"),
+        }
+
+    def _leave_result(leave_type: str, prefix_len: int) -> dict[str, Any]:
+        team = resolve_leave_team(issue, epic_issues or [], teams_cfg, config)
         comment = summary[prefix_len:].strip(" -:")
         return {
             "kind": "leave",
             "leaveType": leave_type,
             "team": team,
             "comment": comment,
-            "task": None,
         }
 
     if lower.startswith(planned_p):
-        return _leave_result("planned", "planned", len(prefixes.get("planned") or "Leave | Planned"))
+        return _leave_result("planned", len(prefixes.get("planned") or "Leave | Planned"))
     if lower.startswith(unplanned_p):
         return _leave_result(
-            "unplanned", "unplanned", len(prefixes.get("unplanned") or "Leave | Unplanned")
+            "unplanned", len(prefixes.get("unplanned") or "Leave | Unplanned")
         )
     if lower.startswith(generic_p):
-        return _leave_result("planned", "generic", len(prefixes.get("generic") or "Leave |"))
+        return _leave_result("planned", len(prefixes.get("generic") or "Leave |"))
+
+    assess_platform = assessment_target(summary, config)
+    if assess_platform == QA_CROSS:
+        return _work(QA_CROSS, STAGE_TEST_PLANNING, "qa")
+    if assess_platform in PLATFORM_KEYS:
+        return _work(assess_platform, STAGE_ASSESSMENT, assess_platform)
 
     team = team_from_issue(issue, teams_cfg, config)
     itype = issue_type_name(issue)
+    qa_stream = qa_platform_stream(summary)
 
     if team == "qa" or itype == "test execution":
-        stream = qa_work_stream(summary)
-        if "pre-prod" in lower or "pre prod" in lower:
-            task = (
-                "QA mobile pre-prod"
-                if stream == "mobile"
-                else "QA web pre-prod"
-            )
-            return {"kind": "work", "task": task, "team": "qa", "issueKey": issue.get("key")}
-        if (
-            "1st iteration" in lower
-            or "2nd iteration" in lower
-            or "iteration" in lower
-            or "test case" in lower
-        ):
-            task = (
-                "QA mobile stage + Admin + Bug fixes"
-                if stream == "mobile"
-                else "QA web/Mweb stage + Admin + Bug fixes"
-            )
-            return {"kind": "work", "task": task, "team": "qa", "issueKey": issue.get("key")}
-        return {
-            "kind": "work",
-            "task": "QA Test cases & planning",
-            "team": "qa",
-            "issueKey": issue.get("key"),
-        }
+        if qa_stream:
+            release_stage = _qa_scoped_release_stage(summary, qa_stream)
+            if release_stage and qa_stream in ("frontend", "mobile"):
+                return _work(qa_stream, release_stage, "qa")
+            if qa_stream == "backend":
+                prod = _backend_prod_stage(summary)
+                if prod:
+                    return _work("backend", prod, "qa")
+            if _is_stage_testing_qa(summary):
+                return _work(qa_stream, STAGE_STAGE_TESTING, "qa")
+            mapped = _match_config_stage(stage_mapping, qa_stream, summary)
+            if mapped:
+                return _work(qa_stream, mapped, "qa")
+        markers_planning = (
+            "test case",
+            "test cases",
+            "test planning",
+            "test execution",
+            "qa planning",
+        )
+        if any(m in lower for m in markers_planning) or qa_stream is None:
+            return _work(QA_CROSS, STAGE_TEST_PLANNING, "qa")
+        return _work(qa_stream, STAGE_STAGE_TESTING, "qa")
 
-    for rule in timeline_cfg.get("mappingRules") or []:
-        if not mapping_rule_applies(rule, summary, team):
-            continue
-        if rule.get("leaveType"):
-            continue
-        task = rule.get("task")
-        if task is None and rule.get("useTeamBugRow"):
-            bug_map = {
-                "backend": "BE bugs fixes",
-                "frontend": "Web bug fixes",
-                "mobile": "Mobile bug fixes",
-            }
-            if itype == "bug" or "bug" in lower:
-                task = bug_map.get(team)
-            if not task:
-                continue
-        if task:
-            return {"kind": "work", "task": task, "team": team, "issueKey": issue.get("key")}
+    if team == "backend" or qa_stream == "backend":
+        prod = _backend_prod_stage(summary)
+        if prod:
+            return _work("backend", prod, team if team != TEAM_OTHER else "backend")
+        if "go live" in lower:
+            return _work("backend", STAGE_GO_LIVE, "backend")
+
+    if team in PLATFORM_KEYS:
+        mapped = _match_config_stage(stage_mapping, team, summary)
+        if mapped:
+            return _work(team, mapped, team)
+        if team in ("frontend", "mobile"):
+            release_stage = _qa_scoped_release_stage(summary, team)
+            if release_stage:
+                return _work(team, release_stage, team)
+        if "go live" in lower:
+            return _work(team, STAGE_GO_LIVE, team)
 
     if itype == "bug":
-        bug_map = {
-            "backend": "BE bugs fixes",
-            "frontend": "Web bug fixes",
-            "mobile": "Mobile bug fixes",
-            "qa": "QA web/Mweb stage + Admin + Bug fixes",
-        }
-        task = bug_map.get(team)
-        if task:
-            return {"kind": "work", "task": task, "team": team, "issueKey": issue.get("key")}
+        return {"kind": "unmapped", "platform": None, "stage": None, "team": team}
 
-    prefix_task = task_from_pipe_prefix_team(summary, team, timeline_cfg, itype, config)
-    if prefix_task:
-        return {
-            "kind": "work",
-            "task": prefix_task,
-            "team": team,
-            "issueKey": issue.get("key"),
-        }
+    dev_stage = task_from_pipe_prefix_team(summary, team, timeline_cfg, itype, config)
+    if dev_stage and team in PLATFORM_KEYS:
+        return _work(team, dev_stage, team)
 
-    return {"kind": "unmapped", "task": None, "team": team, "issueKey": issue.get("key")}
+    return {"kind": "unmapped", "platform": None, "stage": None, "team": team}
+
+
+def _apply_synthetic_buffers(
+    platform_buckets: dict[str, dict[str, dict[str, Any]]],
+    buffers: dict[str, Any],
+) -> None:
+    bug_pct = float(buffers.get("bugFixesPercentOfDevelopment", 0.10))
+    final_pct = float(buffers.get("stageFinalTestingPercentOfStageTesting", 0.10))
+    for platform in PLATFORM_KEYS:
+        buckets = platform_buckets.get(platform) or {}
+        dev = buckets.get(STAGE_DEVELOPMENT, _empty_stage_bucket())
+        stage = buckets.get(STAGE_STAGE_TESTING, _empty_stage_bucket())
+        dev_h = dev["effortsHours"]
+        stage_h = stage["effortsHours"]
+        if STAGE_BUG_FIXES in buckets and dev_h > 0:
+            b = buckets[STAGE_BUG_FIXES]
+            b["effortsHours"] = round(dev_h * bug_pct, 1)
+            b["source"] = "synthetic"
+        if STAGE_STAGE_FINAL_TESTING in buckets and stage_h > 0:
+            f = buckets[STAGE_STAGE_FINAL_TESTING]
+            f["effortsHours"] = round(stage_h * final_pct, 1)
+            f["source"] = "synthetic"
+
+
+def _stage_to_row(
+    stage_name: str,
+    bucket: dict[str, Any],
+    hours_per_day: float,
+) -> dict[str, Any]:
+    resources = float(len(bucket["resources"])) if bucket["resources"] else 0.0
+    start = min(bucket["starts"]) if bucket["starts"] else None
+    end = max(bucket["ends"]) if bucket["ends"] else None
+    calc = calc_days(
+        bucket["effortsHours"],
+        bucket["plannedLeaveHours"],
+        bucket["unplannedDelayHours"],
+        resources,
+        hours_per_day,
+    )
+    return {
+        "stage": stage_name,
+        "source": bucket.get("source") or ("jira" if bucket["issueKeys"] else None),
+        "resources": resources if resources > 0 else None,
+        "effortsHours": round(bucket["effortsHours"], 1) if bucket["effortsHours"] else None,
+        "plannedLeaveHours": round(bucket["plannedLeaveHours"], 1),
+        "unplannedDelayHours": round(bucket["unplannedDelayHours"], 1),
+        "start": start,
+        "end": end,
+        "calculatedDays": calc,
+        "issueKeys": list(bucket["issueKeys"]),
+    }
+
+
+def _build_platform_block(
+    platform: str,
+    stage_order: list[str],
+    buckets: dict[str, dict[str, Any]],
+    hours_per_day: float,
+) -> dict[str, Any]:
+    stages_out: list[dict[str, Any]] = []
+    dated_ends: list[str] = []
+    dated_starts: list[str] = []
+    go_live = None
+    for name in stage_order:
+        b = buckets.get(name, _empty_stage_bucket())
+        row = _stage_to_row(name, b, hours_per_day)
+        stages_out.append(row)
+        if row.get("start"):
+            dated_starts.append(row["start"])
+        if row.get("end"):
+            dated_ends.append(row["end"])
+        if name == STAGE_GO_LIVE and row.get("end"):
+            go_live = row["end"]
+    delivery_start = min(dated_starts) if dated_starts else None
+    delivery_end = max(dated_ends) if dated_ends else None
+    if not go_live:
+        go_live = delivery_end
+    return {
+        "platform": platform,
+        "side": PLATFORM_SIDE[platform],
+        "deliveryStart": delivery_start,
+        "deliveryEnd": delivery_end,
+        "goLive": go_live,
+        "stages": stages_out,
+    }
 
 
 def build_timeline_breakdown(
@@ -317,7 +516,9 @@ def build_timeline_breakdown(
     teams_cfg = config.get("teams") or {}
     hours_per_day = float(timeline_cfg.get("hoursPerDay", 6))
     side_display_map = timeline_cfg.get("sideDisplay") or {}
-    canonical_tasks = timeline_cfg.get("canonicalTasks") or []
+    execution_stages = timeline_cfg.get("executionStages") or DEFAULT_EXECUTION_STAGES
+    qa_stages = timeline_cfg.get("qaCrossPlatformStages") or [STAGE_TEST_PLANNING]
+    buffers = timeline_cfg.get("effortBuffers") or {}
 
     index = {i["key"]: i for i in issues if i.get("key")}
     scheduled_by_key = {r["key"]: r for r in schedule.get("scheduled", [])}
@@ -341,24 +542,11 @@ def build_timeline_breakdown(
         if epic_key not in index and not epic_issues:
             continue
 
-        buckets: dict[str, dict[str, Any]] = {}
-        for ct in canonical_tasks:
-            name = ct["name"]
-            side = canonical_side(ct, side_display_map)
-            buckets[name] = {
-                "task": name,
-                "team": side,
-                "resources": set(),
-                "effortsHours": 0.0,
-                "plannedLeaveHours": 0.0,
-                "unplannedDelayHours": 0.0,
-                "starts": [],
-                "ends": [],
-                "leaveComments": [],
-                "otherComments": [],
-                "issueKeys": [],
-            }
-
+        platform_buckets: dict[str, dict[str, dict[str, Any]]] = {
+            p: _init_platform_buckets(execution_stages.get(p, DEFAULT_EXECUTION_STAGES[p]))
+            for p in PLATFORM_KEYS
+        }
+        qa_buckets = _init_platform_buckets(list(qa_stages))
         leave_by_side: dict[str, dict[str, float]] = defaultdict(
             lambda: {"planned": 0.0, "unplanned": 0.0}
         )
@@ -377,7 +565,6 @@ def build_timeline_breakdown(
             classification = classify_issue(
                 issue, timeline_cfg, teams_cfg, config, epic_issues=epic_issues
             )
-
             member = assignee_name(issue)
             sch = scheduled_by_key.get(key)
             sch_start = sch["startDate"] if sch else None
@@ -398,10 +585,6 @@ def build_timeline_breakdown(
                     end=sch_end,
                     issue_key=key,
                 )
-                if classification.get("comment"):
-                    for bn in buckets:
-                        if buckets[bn]["team"] == side:
-                            buckets[bn]["leaveComments"].append(classification["comment"])
                 continue
 
             if classification["kind"] == "unmapped":
@@ -415,7 +598,7 @@ def build_timeline_breakdown(
                         start=sch_start,
                         end=sch_end,
                         issue_key=key,
-                        task_name="(unmapped)",
+                        stage_name="(unmapped)",
                     )
                     unmapped.append(
                         {
@@ -427,13 +610,29 @@ def build_timeline_breakdown(
                     )
                 continue
 
-            task_name = classification["task"]
-            if task_name not in buckets:
+            platform = classification["platform"]
+            stage_name = classification["stage"]
+            if not platform or not stage_name:
                 continue
 
-            b = buckets[task_name]
-            member_side = side_display(classification.get("team") or team, side_display_map)
+            if platform == QA_CROSS:
+                bucket_map = qa_buckets
+            else:
+                bucket_map = platform_buckets[platform]
+
+            if stage_name not in bucket_map:
+                bucket_map[stage_name] = _empty_stage_bucket()
+
+            b = bucket_map[stage_name]
+            member_side = platform_side(platform, side_display_map)
+            if platform != QA_CROSS:
+                member_side = side_display(classification.get("team") or platform, side_display_map)
+                if classification.get("team") == "qa":
+                    member_side = side_display("qa", side_display_map)
+
             b["effortsHours"] += est_h
+            if b.get("source") != "synthetic":
+                b["source"] = "jira"
             assignee = get_field(issue, "assignee")
             if assignee:
                 aid = assignee.get("displayName") or assignee.get("accountId")
@@ -451,81 +650,116 @@ def build_timeline_breakdown(
                 start=sch_start,
                 end=sch_end,
                 issue_key=key,
-                task_name=task_name,
+                stage_name=stage_name,
             )
 
-        # Distribute leave hours to rows on matching side (fallback: highest-effort row on epic)
+        _apply_synthetic_buffers(platform_buckets, buffers)
+
         for side_name, amounts in leave_by_side.items():
+            plat = None
+            for p, s in PLATFORM_SIDE.items():
+                if s == side_name:
+                    plat = p
+                    break
+            target_buckets = platform_buckets.get(plat or "") if plat else None
+            if not target_buckets:
+                continue
             side_rows = [
                 n
-                for n, b in buckets.items()
-                if b["team"] == side_name and b["effortsHours"] > 0
+                for n, b in target_buckets.items()
+                if b["effortsHours"] > 0 and n not in (STAGE_BUG_FIXES, STAGE_STAGE_FINAL_TESTING)
             ]
             if not side_rows:
-                side_rows = [n for n, b in buckets.items() if b["team"] == side_name]
-            if not side_rows:
-                side_rows = [n for n, b in buckets.items() if b["effortsHours"] > 0]
+                side_rows = [n for n, b in target_buckets.items() if b["effortsHours"] > 0]
             if not side_rows:
                 continue
-            target = max(side_rows, key=lambda n: buckets[n]["effortsHours"])
-            buckets[target]["plannedLeaveHours"] += amounts["planned"]
-            buckets[target]["unplannedDelayHours"] += amounts["unplanned"]
+            target = max(side_rows, key=lambda n: target_buckets[n]["effortsHours"])
+            target_buckets[target]["plannedLeaveHours"] += amounts["planned"]
+            target_buckets[target]["unplannedDelayHours"] += amounts["unplanned"]
 
-        task_rows: list[dict[str, Any]] = []
-        for ct in canonical_tasks:
-            name = ct["name"]
-            b = buckets[name]
-            resources = float(len(b["resources"])) if b["resources"] else 0.0
-            start = min(b["starts"]) if b["starts"] else None
-            end = max(b["ends"]) if b["ends"] else None
-            calc = calc_days(
-                b["effortsHours"],
-                b["plannedLeaveHours"],
-                b["unplannedDelayHours"],
-                resources,
-                hours_per_day,
+        execution_out: dict[str, Any] = {}
+        all_starts: list[str] = []
+        all_ends: list[str] = []
+        for platform in PLATFORM_KEYS:
+            order = execution_stages.get(platform, DEFAULT_EXECUTION_STAGES[platform])
+            block = _build_platform_block(
+                platform, order, platform_buckets[platform], hours_per_day
             )
-            leave_c = "; ".join(dict.fromkeys(b["leaveComments"]))[:120] or None
-            other_c = None
-            if b["issueKeys"] and len(b["issueKeys"]) <= 3:
-                other_c = ", ".join(b["issueKeys"])
-            task_rows.append(
+            execution_out[platform] = block
+            if block.get("deliveryStart"):
+                all_starts.append(block["deliveryStart"])
+            if block.get("deliveryEnd"):
+                all_ends.append(block["deliveryEnd"])
+
+        qa_block = {
+            "stages": [
+                _stage_to_row(name, qa_buckets.get(name, _empty_stage_bucket()), hours_per_day)
+                for name in qa_stages
+            ]
+        }
+
+        legacy_tasks: list[dict[str, Any]] = []
+        for platform in PLATFORM_KEYS:
+            side = PLATFORM_SIDE[platform]
+            for row in execution_out[platform]["stages"]:
+                legacy_tasks.append(
+                    {
+                        "task": row["stage"],
+                        "team": side,
+                        "resources": row.get("resources"),
+                        "effortsHours": row.get("effortsHours"),
+                        "plannedLeaveHours": row.get("plannedLeaveHours"),
+                        "unplannedDelayHours": row.get("unplannedDelayHours"),
+                        "start": row.get("start"),
+                        "end": row.get("end"),
+                        "calculatedDays": row.get("calculatedDays"),
+                        "calendarDays": None,
+                        "leaveComment": None,
+                        "otherComments": None,
+                    }
+                )
+        for row in qa_block["stages"]:
+            legacy_tasks.append(
                 {
-                    "task": name,
-                    "team": b["team"],
-                    "resources": resources if resources > 0 else None,
-                    "effortsHours": round(b["effortsHours"], 1) if b["effortsHours"] else None,
-                    "plannedLeaveHours": round(b["plannedLeaveHours"], 1),
-                    "unplannedDelayHours": round(b["unplannedDelayHours"], 1),
-                    "start": start,
-                    "end": end,
-                    "calculatedDays": calc,
-                    "calendarDays": None,
-                    "leaveComment": leave_c,
-                    "otherComments": other_c,
+                    "task": row["stage"],
+                    "team": "QA",
+                    "resources": row.get("resources"),
+                    "effortsHours": row.get("effortsHours"),
+                    "plannedLeaveHours": row.get("plannedLeaveHours"),
+                    "unplannedDelayHours": row.get("unplannedDelayHours"),
+                    "start": row.get("start"),
+                    "end": row.get("end"),
+                    "calculatedDays": row.get("calculatedDays"),
                 }
             )
 
-        dated = [r for r in task_rows if r.get("start") and r.get("end")]
-        delivery_start = min(r["start"] for r in dated) if dated else None
-        delivery_end = max(r["end"] for r in dated) if dated else None
-        go_live_row = next((r for r in task_rows if r["task"] == "Go live date"), None)
-        go_live = go_live_row.get("end") if go_live_row and go_live_row.get("end") else delivery_end
+        delivery_start = min(all_starts) if all_starts else None
+        delivery_end = max(all_ends) if all_ends else None
+        go_lives = [
+            execution_out[p].get("goLive")
+            for p in PLATFORM_KEYS
+            if execution_out.get(p, {}).get("goLive")
+        ]
+        go_live = max(go_lives) if go_lives else delivery_end
 
         members_by_side = build_members_by_side(member_stats, hours_per_day)
-
         team_summary: dict[str, Any] = {}
         for side in TEAM_PLAN_SIDES:
             members = members_by_side.get(side, [])
-            rows = [r for r in task_rows if r["team"] == side]
-            if not rows and not members:
+            plat_key = next((p for p, s in PLATFORM_SIDE.items() if s == side), None)
+            stage_rows = (
+                execution_out[plat_key]["stages"] if plat_key and plat_key in execution_out else []
+            )
+            if side == "QA":
+                stage_rows = qa_block["stages"]
+            if not stage_rows and not members:
                 continue
-            peak = max((r["resources"] or 0) for r in rows) if rows else 0
+            peak = max((r.get("resources") or 0) for r in stage_rows) if stage_rows else 0
             if members:
                 peak = max(peak, float(len(members)))
             total_effort = sum(m.get("effortsHours") or 0 for m in members)
-            if not total_effort and rows:
-                total_effort = sum(r["effortsHours"] or 0 for r in rows)
+            if not total_effort and stage_rows:
+                total_effort = sum(r.get("effortsHours") or 0 for r in stage_rows)
             total_leave = sum(m.get("plannedLeaveHours") or 0 for m in members)
             total_delay = sum(m.get("unplannedDelayHours") or 0 for m in members)
             team_summary[side] = {
@@ -555,9 +789,11 @@ def build_timeline_breakdown(
                 "deliveryEnd": delivery_end,
                 "goLive": go_live,
                 "calendarDeliveryDays": calendar_days,
+                "executionStages": execution_out,
+                "qaCrossPlatform": qa_block,
                 "teamSummary": team_summary,
                 "membersBySide": members_by_side,
-                "tasks": task_rows,
+                "tasks": legacy_tasks,
                 "unmapped": unmapped,
             }
         )

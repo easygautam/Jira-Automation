@@ -32,4 +32,4 @@ Optional debug: `python scripts/data_quality.py --issues ... --schedule ...` (wr
 
 ## Report sections (order)
 
-Executive summary → Delivery items (Epics) → Timeline breakdown (**Teams plan** = Backend/Web/Mobile/QA only; milestones in Task breakdown) → Bug fix effort (epic × Backend/Web/Mobile table + member detail) → Team tasks plan (per-member scheduled tasks) → Data quality (status-aware bug time rules; reason summary; consolidated rows) (+ Schedule Delta on recalc).
+Executive summary → Delivery items (Epics) → Timeline breakdown (**Teams plan** + **Execution stages** per Backend/Web/Mobile + QA all-platforms; platform go-live) → Bug fix effort (epic × Backend/Web/Mobile table + member detail) → Team tasks plan → Data quality (+ Schedule Delta on recalc).

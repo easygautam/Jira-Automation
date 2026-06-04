@@ -16,6 +16,8 @@ disable-model-invocation: true
 
 Report shape and sections are produced by `scripts/render_report.py` (not hand-authored markdown). Status rules: `.cursor/rules/schedule-engine.mdc`.
 
+**Timeline:** **Execution stages** — separate tables per Backend/Web/Mobile platform (ordered pipeline + synthetic bug/final-test buffers) plus **QA (all platforms)** for cross-cutting test planning. Platform delivery windows and go-live lines appear under each epic.
+
 ## Bug fix effort
 
 - Summary table: all sprint epics — Epic ID, Epic Name, Backend, Web, Mobile, Bugs (worklog hours; — when none)

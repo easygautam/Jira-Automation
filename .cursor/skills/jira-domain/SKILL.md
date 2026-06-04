@@ -45,4 +45,4 @@ Leave tasks: summary starts with `Leave |` (see `timeline.leaveTaskPrefixes`). `
 
 ## Team from summary
 
-First `|` segment only → `jira_teams.py` + `teamPrefixMapping` in config. Unmatched or no pipe → **Other**. QA on `QA | APP | …` is QA, not Mobile. Full alias list lives in config, not duplicated here.
+First `|` segment only → `jira_teams.py` + `teamPrefixMapping` in config. Unmatched or no pipe → **Other**. QA on `QA | APP | …` is QA, not Mobile. Assessment tasks: `{prefix} | Assessment` → platform Assessment; `QA | Assessment` → cross-platform test planning. `qa_platform_stream()` scopes `QA | Web/Mobile/BE` to frontend/mobile/backend. Full alias list lives in config, not duplicated here.

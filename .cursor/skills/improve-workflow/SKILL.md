@@ -61,6 +61,7 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`em-orchest
 
 ## Changelog
 
+- 2026-06-03 — Execution stages: per-platform pipelines (Backend/Web/Mobile), QA cross-platform Test planning, prefix `| Assessment` mapping, `QA | Web/Mobile/BE` streams, synthetic Bug fixes / Stage final testing buffers, separate Pre-Prod/UAT/Ready for release and Prod release/Prod final testing; report section renamed from Task breakdown.
 - 2026-06-03 — Epic sort: Jira Rank (LexoRank / `fields.rank`) for Delivery items, Timeline, and Bug fix effort; shared `epic_jira_sort_key` in `jira_normalize.py`.
 - 2026-06-03 — Delivery items sort: PRD-titled epics first, then nearest due date (`delivery_epic_sort_key`). *(superseded by Jira Rank sort)*
 - 2026-06-03 — Bug DQ: `bugNoWorklogStatuses` (Not a Bug) skip missing-logged-time flags and unscheduled noise.

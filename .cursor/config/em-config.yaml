@@ -99,54 +99,61 @@ timeline:
     qa: QA
     other: Other
     unknown: Other
-  # Task/Sub-task with recognized pipe prefix but no keyword rule → canonical row
+  # Pipe-prefix Task/Sub-task with no stage rule → Development on that platform
   defaultTaskByTeam:
-    backend: BE development
-    frontend: Web development
-    mobile: Mobile development
-  canonicalTasks:
-    - { name: PRD Tech Discussion }
-    - { name: BE Assessment, side: Backend }
-    - { name: Web Assessment, side: Web }
-    - { name: Mobile Assessment, side: Mobile }
-    - { name: QA Test cases & planning, side: QA }
-    - { name: BE development, side: Backend }
-    - { name: Web development, side: Web }
-    - { name: Mobile development, side: Mobile }
-    - { name: QA backend (API Contract & Testing), side: Backend }
-    - { name: QA web/Mweb stage + Admin + Bug fixes, side: Web }
-    - { name: QA mobile stage + Admin + Bug fixes, side: Mobile }
-    - { name: BE bugs fixes, side: Backend }
-    - { name: Web bug fixes, side: Web }
-    - { name: Mobile bug fixes, side: Mobile }
-    - { name: UAT stage, side: QA }
-    - { name: QA web pre-prod, side: Web }
-    - { name: QA mobile pre-prod, side: Mobile }
-    - { name: UAT final, side: QA }
-    - { name: Ready for release }
-    - { name: Go live date }
-  mappingRules:
-    - { keywords: ["leave | planned"], task: null, leaveType: planned }
-    - { keywords: ["leave | unplanned"], task: null, leaveType: unplanned }
-    - { keywords: ["prd handover", "prd tech", "tech discussion"], task: PRD Tech Discussion }
-    - { keywords: ["be assessment", "backend assessment"], task: BE Assessment }
-    - { keywords: ["web assessment", "frontend assessment"], task: Web Assessment }
-    - { keywords: ["mobile assessment", "app assessment", "android assessment"], task: Mobile Assessment }
-    - { keywords: ["test cases", "test case", "qa test cases", "qa planning"], task: QA Test cases & planning }
-    - { keywords: ["qa backend", "api contract", "automation testing", "api contract &"], task: QA backend (API Contract & Testing) }
-    - { keywords: ["qa web", "qa mweb", "mweb stage", "admin + bug"], task: QA web/Mweb stage + Admin + Bug fixes }
-    - { keywords: ["qa mobile stage", "qa app stage"], task: QA mobile stage + Admin + Bug fixes }
-    - { keywords: ["qa web pre-prod", "web pre-prod", "qa pre-prod"], task: QA web pre-prod }
-    - { keywords: ["qa mobile pre-prod", "mobile pre-prod"], task: QA mobile pre-prod }
-    - { keywords: ["uat final", "uat prod"], task: UAT final }
-    - { keywords: ["uat stage", "uat"], task: UAT stage }
-    - { keywords: ["ready for release"], task: Ready for release }
-    - { keywords: ["go live"], task: Go live date }
-    - { keywords: ["be bug", "backend bug", "be bugs"], task: BE bugs fixes }
-    - { keywords: ["web bug", "frontend bug"], task: Web bug fixes }
-    - { keywords: ["mobile bug", "app bug", "android bug"], task: Mobile bug fixes }
-    - { keywords: ["test execution"], task: QA Test cases & planning }
-    - { keywords: ["be", "be development", "backend dev", "dag flow", "enhancement"], task: BE development }
-    - { keywords: ["web", "frontend dev"], task: Web development }
-    - { keywords: ["android", "mobile dev", "app", "ios"], task: Mobile development }
-    - { keywords: ["bug", "defect"], task: null, useTeamBugRow: true }
+    backend: Development
+    frontend: Development
+    mobile: Development
+  effortBuffers:
+    bugFixesPercentOfDevelopment: 0.10
+    stageFinalTestingPercentOfStageTesting: 0.10
+  executionStages:
+    backend:
+      - Assessment
+      - Development
+      - Stage testing
+      - Bug fixes
+      - Stage final testing
+      - Prod release
+      - Prod final testing
+      - Go live date
+    frontend:
+      - Assessment
+      - Development
+      - Stage testing
+      - Bug fixes
+      - Stage final testing
+      - Pre-Prod testing
+      - UAT
+      - Ready for release
+      - Go live date
+    mobile:
+      - Assessment
+      - Development
+      - Stage testing
+      - Bug fixes
+      - Stage final testing
+      - Pre-Prod testing
+      - UAT
+      - Ready for release
+      - Go live date
+  qaCrossPlatformStages:
+    - Test planning
+  leaveMappingRules:
+    - { keywords: ["leave | planned"], leaveType: planned }
+    - { keywords: ["leave | unplanned"], leaveType: unplanned }
+  stageMapping:
+    - { platform: backend, stage: Prod final testing, keywords: ["prod final", "production final", "uat prod"] }
+    - { platform: backend, stage: Prod release, keywords: ["prod release", "production release"], excludeKeywords: ["prod final", "final testing"] }
+    - { platform: backend, stage: Go live date, keywords: ["go live"] }
+    - { platform: frontend, stage: Ready for release, keywords: ["ready for release"] }
+    - { platform: frontend, stage: UAT, keywords: ["uat stage", "uat final", " uat "], excludeKeywords: ["pre-prod", "pre prod"] }
+    - { platform: frontend, stage: Pre-Prod testing, keywords: ["pre-prod", "pre prod", "qa web pre-prod", "web pre-prod"] }
+    - { platform: mobile, stage: Ready for release, keywords: ["ready for release"] }
+    - { platform: mobile, stage: UAT, keywords: ["uat stage", "uat final", " uat "] }
+    - { platform: mobile, stage: Pre-Prod testing, keywords: ["pre-prod", "pre prod", "qa mobile pre-prod", "mobile pre-prod"] }
+    - { platform: frontend, stage: Go live date, keywords: ["go live"] }
+    - { platform: mobile, stage: Go live date, keywords: ["go live"] }
+    - { platform: backend, stage: Development, keywords: ["be development", "backend dev", "dag flow", "enhancement"] }
+    - { platform: frontend, stage: Development, keywords: ["frontend dev", "web dev"] }
+    - { platform: mobile, stage: Development, keywords: ["mobile dev", "android dev", "ios dev"] }

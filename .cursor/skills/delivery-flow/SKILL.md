@@ -61,12 +61,20 @@ If the dependency task is not scheduled (e.g. missing estimate), the engine does
 
 For each Epic, derive current phase from highest child status in pipeline order, or epic status if no children.
 
-## Timeline breakdown rows (sprint report)
+## Execution stages (sprint report timeline)
 
-Sprint report **Timeline breakdown** sections use canonical row names aligned with this pipeline (see `timeline.canonicalTasks` in config):
+Per-epic **Execution stages** tables are **per platform** (`timeline.executionStages` in config). Platforms run on independent planned dates.
 
-PRD Tech Discussion → team assessments → QA test cases & planning → BE/Web/Mobile development → QA stage/pre-prod rows → bug fixes → UAT → Ready for release → Go live date.
+| Platform | Stage order (summary) |
+|----------|------------------------|
+| Backend | Assessment → Development → Stage testing → Bug fixes (10% of dev) → Stage final testing (10% of stage testing) → Prod release → Prod final testing → Go live date |
+| Web / Mobile | Assessment → Development → Stage testing → Bug fixes → Stage final testing → Pre-Prod testing → UAT → Ready for release → Go live date |
 
-Mapping from Jira summaries/labels is config-driven (`timeline.mappingRules`); delivery phases above inform keyword rules, not the 8h schedule engine.
+**Jira mapping highlights:**
 
-**Team on tasks:** first `|` prefix via `scripts/jira_teams.py` (see `jira-domain`). Timeline effort counts **Task/Sub-task** only; **Bug** effort is a separate report section.
+- `{BE\|Web\|App prefix} \| Assessment` → platform Assessment
+- `QA \| Assessment` (no Web/Mobile/BE stream) → **QA (all platforms)** Test planning (once, not triple-counted)
+- `QA \| Web` / `QA \| Mobile` / `QA \| BE` → Stage testing or release stages on that platform (Pre-Prod, UAT, Ready for release are **separate** rows per Web/Mobile)
+- Pipe-prefix dev tasks → Development; buffers in `timeline.effortBuffers`
+
+**Team on tasks:** first `|` prefix via `scripts/jira_teams.py` (see `jira-domain`). Timeline effort counts **Task/Sub-task** only; **Bug** effort is a separate report section (worklog). Timeline does not bucket Bug issue types.

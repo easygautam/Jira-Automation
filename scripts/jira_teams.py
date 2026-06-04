@@ -5,15 +5,14 @@ from __future__ import annotations
 
 from typing import Any
 
-# Canonical task names that must not match via keywords when first prefix is QA
-_DEV_TASK_NAMES = frozenset(
+# Stage names that must not match generic dev keyword rules when first prefix is QA
+_DEV_STAGE_NAMES = frozenset(
     {
+        "Development",
+        "Assessment",
         "BE development",
         "Web development",
         "Mobile development",
-        "BE Assessment",
-        "Web Assessment",
-        "Mobile Assessment",
     }
 )
 
@@ -124,15 +123,63 @@ def team_from_summary_start(
     return None
 
 
-def qa_work_stream(summary: str) -> str:
-    """When first prefix is QA, infer web vs mobile stream from later pipe segments."""
+def _summary_has_assessment_segment(summary: str) -> bool:
+    """True when a pipe segment is Assessment (e.g. BE | Assessment)."""
+    if "|" not in summary:
+        return False
+    parts = [p.strip().casefold() for p in summary.split("|")]
+    return any(p == "assessment" or p.endswith(" assessment") for p in parts[1:]) or (
+        parts[-1] == "assessment"
+    )
+
+
+def assessment_target(
+    summary: str,
+    config: dict[str, Any] | None = None,
+) -> str | None:
+    """
+    Platform key for Assessment stage, or qa_cross for QA | Assessment.
+    None if title is not an assessment task.
+    """
+    if not _summary_has_assessment_segment(summary):
+        return None
+    alias_sets = load_prefix_alias_sets(config)
+    team = team_from_first_prefix(summary, alias_sets)
+    if team == "qa":
+        return "qa_cross"
+    if team in ("backend", "frontend", "mobile"):
+        return team
+    return None
+
+
+def qa_platform_stream(summary: str) -> str | None:
+    """
+    When first prefix is QA, return backend | frontend | mobile for scoped QA work.
+    None when QA title has no Web/Mobile/BE stream (cross-platform test planning).
+    """
     parts = [p.strip().lower() for p in summary.split("|")]
+    if not parts or parts[0] != "qa":
+        return None
     if len(parts) < 2:
-        return "web"
+        return None
     context = " ".join(parts[1:])
+    if any(x in context for x in ("be", "backend", "api contract")):
+        return "backend"
     if any(x in context for x in ("app", "mobile", "android", "ios")):
         return "mobile"
     if any(x in context for x in ("web", "website", "mweb", "frontend", "fe", "admin")):
+        return "frontend"
+    return None
+
+
+def qa_work_stream(summary: str) -> str:
+    """Legacy web/mobile stream; prefer qa_platform_stream for new code."""
+    stream = qa_platform_stream(summary)
+    if stream == "backend":
+        return "web"
+    if stream == "mobile":
+        return "mobile"
+    if stream == "frontend":
         return "web"
     return "web"
 
@@ -196,11 +243,23 @@ def task_from_pipe_prefix_team(
     return defaults.get(team)
 
 
-def mapping_rule_applies(rule: dict[str, Any], summary: str, team: str) -> bool:
-    """Keyword match; skip dev-task rules when title is QA-prefixed."""
-    task = rule.get("task")
-    if task in _DEV_TASK_NAMES and team == "qa":
-        return False
+def stage_mapping_rule_applies(rule: dict[str, Any], summary: str) -> bool:
+    """Keyword match with optional excludeKeywords."""
     keywords = [k.lower() for k in rule.get("keywords") or []]
+    if not keywords:
+        return False
     lower = summary.lower()
-    return bool(keywords) and any(kw in lower for kw in keywords)
+    if not any(kw in lower for kw in keywords):
+        return False
+    for ex in rule.get("excludeKeywords") or []:
+        if ex.lower() in lower:
+            return False
+    return True
+
+
+def mapping_rule_applies(rule: dict[str, Any], summary: str, team: str) -> bool:
+    """Keyword match; skip dev-stage rules when title is QA-prefixed."""
+    stage = rule.get("stage") or rule.get("task")
+    if stage in _DEV_STAGE_NAMES and team == "qa":
+        return False
+    return stage_mapping_rule_applies(rule, summary)
