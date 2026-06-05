@@ -17,6 +17,8 @@ Canonical inventory for agents. **Runbook:** `.cursor/skills/em-orchestrator/SKI
 
 Team prefixes: `scripts/jira_teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment only; else **Other**). Details: `jira-domain` skill.
 
+**Sprint window rule:** reports cover the complete active sprint (sprint start → end) across all statuses (closed/deferred included); each section applies its own status condition. Timeline `Start`/`End` are `—` placeholders (calendar dates deferred).
+
 ## Config & entrypoints
 
 - Jira title/estimate guide for teams: [`docs/JIRA-BEST-PRACTICES.md`](../docs/JIRA-BEST-PRACTICES.md)
@@ -33,4 +35,4 @@ Optional debug: `python scripts/data_quality.py --issues ... --schedule ...` (wr
 
 ## Report sections (order)
 
-Executive summary → Delivery items (Epics) → Timeline breakdown (**Teams plan** + **Execution stages** per Backend/Web/Mobile + QA all-platforms; platform go-live) → Bug fix effort (epic × Backend/Web/Mobile table + member detail) → Team tasks plan → Data quality (+ Schedule Delta on recalc).
+Executive summary → Delivery items (Epics) → Timeline breakdown (**Teams plan** with combined `Leave (h)` summary + detailed member breakdown; **Execution stages** per Backend/Web/Mobile, omitting platforms with no tasks, + QA all-platforms) → Bug fix effort (epic × Backend/Web/Mobile table + member detail) → Team tasks plan → Data quality (+ Schedule Delta on recalc).

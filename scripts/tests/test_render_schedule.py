@@ -12,14 +12,19 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from render_report import (  # noqa: E402
     epic_prd_anchor,
     epic_title_link,
+    jira_issue_link,
+    jira_issue_keys_linked,
     phase_for_epic,
     render_bug_sections,
     render_data_quality_section,
     render_report,
     render_schedule_delta_section,
     render_team_tasks_plan,
+    render_timeline_sections,
     schedule_member_anchor,
 )
+
+JIRA_SITE = "https://physicswallah001.atlassian.net"
 
 
 def _issue(key: str, summary: str, assignee: str = "Alice") -> dict:
@@ -36,6 +41,7 @@ def _issue(key: str, summary: str, assignee: str = "Alice") -> dict:
 
 
 CONFIG = {
+    "jira": {"siteUrl": JIRA_SITE},
     "teams": {"backend": ["be"], "qa": ["qa"]},
     "teamPrefixMapping": {
         "backend": {"aliases": ["be"]},
@@ -58,6 +64,21 @@ CONFIG = {
         "bugActiveStatuses": ["To Do", "In Progress", "Hold", "Deferred"],
     },
 }
+
+
+class TestJiraIssueLinks(unittest.TestCase):
+    def test_issue_link_markdown(self):
+        self.assertEqual(
+            jira_issue_link(JIRA_SITE, "VP-20013"),
+            "[VP-20013](https://physicswallah001.atlassian.net/browse/VP-20013)",
+        )
+
+    def test_issue_keys_linked_truncates(self):
+        keys = ["VP-1", "VP-2", "VP-3", "VP-4", "VP-5"]
+        linked = jira_issue_keys_linked(JIRA_SITE, keys)
+        self.assertIn("[VP-4]", linked)
+        self.assertNotIn("VP-5", linked)
+        self.assertTrue(linked.endswith("…"))
 
 
 class TestScheduleAnchor(unittest.TestCase):
@@ -107,11 +128,12 @@ class TestTeamTasksPlan(unittest.TestCase):
             {"alice": "Alice"},
             issue_by_key,
             est,
-            None,
+            JIRA_SITE,
             CONFIG,
         )
         body = "\n".join(lines)
         self.assertIn("## Team tasks plan", body)
+        self.assertIn("[VP-1](https://physicswallah001.atlassian.net/browse/VP-1)", body)
         self.assertNotIn("Schedule by assignee", body)
         self.assertNotIn("| Team | Member |", body)
         self.assertIn("### Alice", body)
@@ -145,12 +167,123 @@ class TestBugEffortTable(unittest.TestCase):
                 "bySide": {},
             }
         ]
-        body = "\n".join(render_bug_sections(bug_data, None))
+        body = "\n".join(render_bug_sections(bug_data, JIRA_SITE))
         self.assertIn("| Epic ID | Epic Name | Backend | Web | Mobile | Bugs |", body)
-        self.assertIn("| VP-2 | Test PRD | 2.0 | 1.0 | — | 2 |", body)
+        self.assertIn(
+            "| [VP-2](https://physicswallah001.atlassian.net/browse/VP-2) | Test PRD | 2.0 | 1.0 | — | 2 |",
+            body,
+        )
         self.assertNotIn("#### By team", body)
         self.assertIn("| Member | Bug effort (h) | Bug count |", body)
         self.assertNotIn("| Member | Team |", body)
+
+
+class TestTimelineSectionsRender(unittest.TestCase):
+    def _timeline(self) -> list[dict]:
+        backend_stages = [
+            {
+                "stage": "Development",
+                "source": "jira",
+                "resources": 1.0,
+                "effortsHours": 8.0,
+                "plannedLeaveHours": 2.0,
+                "unplannedDelayHours": 1.0,
+                "start": None,
+                "end": None,
+                "calculatedDays": 2,
+                "issueKeys": ["VP-101"],
+            }
+        ]
+        web_stages = [
+            {
+                "stage": "Development",
+                "source": None,
+                "resources": None,
+                "effortsHours": None,
+                "plannedLeaveHours": 0.0,
+                "unplannedDelayHours": 0.0,
+                "start": None,
+                "end": None,
+                "calculatedDays": None,
+                "issueKeys": [],
+            }
+        ]
+        return [
+            {
+                "epicKey": "VP-100",
+                "prdName": "Test PRD",
+                "deliveryStart": None,
+                "deliveryEnd": None,
+                "goLive": None,
+                "calendarDeliveryDays": None,
+                "executionStages": {
+                    "backend": {"hasWork": True, "stages": backend_stages},
+                    "frontend": {"hasWork": False, "stages": web_stages},
+                    "mobile": {"hasWork": False, "stages": []},
+                },
+                "qaCrossPlatform": {"stages": []},
+                "teamSummary": {
+                    "Backend": {
+                        "peakResources": 1.0,
+                        "totalEffortHours": 8.0,
+                        "totalLeaveHours": 2.0,
+                        "totalDelayHours": 1.0,
+                        "taskCount": 1,
+                        "members": [],
+                    }
+                },
+                "membersBySide": {
+                    "Backend": [
+                        {
+                            "member": "Alice",
+                            "effortsHours": 8.0,
+                            "plannedLeaveHours": 2.0,
+                            "unplannedDelayHours": 1.0,
+                            "start": None,
+                            "end": None,
+                            "calculatedDays": 2,
+                            "issueCount": 1,
+                            "issueKeys": ["VP-101"],
+                            "tasks": ["Development"],
+                        }
+                    ]
+                },
+                "tasks": [],
+                "unmapped": [],
+            }
+        ]
+
+    def test_leave_and_delay_columns(self):
+        body = "\n".join(render_timeline_sections(self._timeline(), JIRA_SITE))
+        # Team summary: single combined Leave column (no separate Planned/Unplanned).
+        self.assertIn(
+            "| Team | Peak resources | Total effort (h) | Leave (h) | Tasks |", body
+        )
+        # Combined leave = planned 2 + unplanned 1 = 3.0
+        self.assertIn("| Backend | 1.0 | 8.0 | 3.0 | 1 |", body)
+        # Member breakdown keeps both Planned leave + Unplanned delay columns.
+        self.assertIn("| Member | Efforts (h) | Planned leave (h) | Unplanned delay (h) |", body)
+        # Execution-stage table has no Delay (h) column and combines leave.
+        self.assertIn(
+            "| Stage | Resources | Efforts (h) | Leave (h) | Start | End | Calc days |", body
+        )
+        self.assertNotIn("Delay (h)", body)
+        self.assertIn(
+            "[VP-101](https://physicswallah001.atlassian.net/browse/VP-101)",
+            body,
+        )
+
+    def test_empty_platform_table_omitted_and_dates_dashed(self):
+        body = "\n".join(render_timeline_sections(self._timeline(), JIRA_SITE))
+        # Backend has work; Web/Mobile do not → only Backend stage table rendered.
+        self.assertIn("**Backend**", body)
+        self.assertNotIn("**Web**", body)
+        self.assertNotIn("**Mobile**", body)
+        # Date-only lines removed.
+        self.assertNotIn("Epic delivery window", body)
+        self.assertNotIn("Go live", body)
+        # Member Start/End rendered as dash placeholders.
+        self.assertIn("| Alice | 8.0 | 2.0 | 1.0 | — | — | 2 |", body)
 
 
 class TestPhaseForEpic(unittest.TestCase):
@@ -186,8 +319,9 @@ class TestDataQualitySection(unittest.TestCase):
                 }
             ]
         }
-        body = "\n".join(render_data_quality_section(by_member, None))
+        body = "\n".join(render_data_quality_section(by_member, JIRA_SITE))
         self.assertIn("## Data quality flags", body)
+        self.assertIn("[VP-1](https://physicswallah001.atlassian.net/browse/VP-1)", body)
         self.assertIn("| Reason | Count |", body)
         self.assertIn("| Missing estimates | 1 |", body)
         self.assertIn("| Unassigned | 1 |", body)
@@ -209,9 +343,12 @@ class TestScheduleDeltaSection(unittest.TestCase):
             ],
             "status_changes": [],
         }
-        body = "\n".join(render_schedule_delta_section(delta, None))
+        body = "\n".join(render_schedule_delta_section(delta, JIRA_SITE))
         self.assertIn("## Schedule Delta", body)
-        self.assertIn("VP-9", body)
+        self.assertIn(
+            "[VP-9](https://physicswallah001.atlassian.net/browse/VP-9)",
+            body,
+        )
 
 
 class TestExecutiveSummary(unittest.TestCase):
@@ -237,6 +374,7 @@ class TestExecutiveSummary(unittest.TestCase):
             None,
             config=CONFIG,
         )
+        self.assertIn("[B1](https://physicswallah001.atlassian.net/browse/B1)", body)
         self.assertIn("active bugs (estimate not required yet)", body)
         self.assertIn("tasks missing Original Estimate", body)
 

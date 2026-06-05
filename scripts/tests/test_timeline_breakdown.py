@@ -184,16 +184,22 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         }
         result = build_timeline_breakdown([epic, t1, t2], schedule, MINIMAL_CONFIG)
         epic_row = result[0]
-        self.assertEqual(epic_row["deliveryStart"], "2026-06-02")
-        self.assertEqual(epic_row["deliveryEnd"], "2026-06-08")
+        # Calendar dates are deferred — all start/end resolve to None.
+        self.assertIsNone(epic_row["deliveryStart"])
+        self.assertIsNone(epic_row["deliveryEnd"])
 
         be_row = _stage_row(epic_row, "backend", STAGE_DEVELOPMENT)
-        self.assertEqual(be_row["start"], "2026-06-02")
-        self.assertEqual(be_row["end"], "2026-06-05")
+        self.assertIsNone(be_row["start"])
+        self.assertIsNone(be_row["end"])
         self.assertEqual(be_row["effortsHours"], 8.0)
         bug_row = _stage_row(epic_row, "backend", "Bug fixes")
         self.assertEqual(bug_row["effortsHours"], 0.8)
         self.assertEqual(bug_row["source"], "synthetic")
+
+        # hasWork: platforms with Jira tasks are flagged; empty ones are not.
+        self.assertTrue(epic_row["executionStages"]["backend"]["hasWork"])
+        self.assertTrue(epic_row["executionStages"]["frontend"]["hasWork"])
+        self.assertFalse(epic_row["executionStages"]["mobile"]["hasWork"])
 
     def test_planned_leave_hours_on_side(self):
         epic = _epic("VP-200")
@@ -245,6 +251,10 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         result = build_timeline_breakdown([epic, t1, t2], schedule, MINIMAL_CONFIG)
         backend_members = result[0]["membersBySide"]["Backend"]
         self.assertEqual(len(backend_members), 2)
+        # Member Start/End dates are deferred (rendered as placeholders).
+        for member in backend_members:
+            self.assertIsNone(member["start"])
+            self.assertIsNone(member["end"])
 
     def test_qa_test_planning_not_tripled(self):
         epic = _epic("VP-700")

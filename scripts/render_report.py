@@ -36,12 +36,37 @@ def jira_browse_url(site_url: str, issue_key: str) -> str:
     return f"{base}/browse/{issue_key}"
 
 
+def resolve_jira_site_url(
+    jira_site_url: str | None,
+    config: dict[str, Any] | None,
+) -> str | None:
+    if jira_site_url:
+        return jira_site_url
+    if config:
+        return (config.get("jira") or {}).get("siteUrl")
+    return None
+
+
 def jira_issue_link(site_url: str | None, issue_key: str | None) -> str:
     if not issue_key:
         return "—"
     if site_url:
         return f"[{issue_key}]({jira_browse_url(site_url, issue_key)})"
     return issue_key
+
+
+def jira_issue_keys_linked(
+    site_url: str | None,
+    keys: list[str] | None,
+    *,
+    limit: int = 4,
+) -> str:
+    if not keys:
+        return "—"
+    shown = keys[:limit]
+    parts = [jira_issue_link(site_url, k) for k in shown]
+    suffix = "…" if len(keys) > limit else ""
+    return ", ".join(parts) + suffix
 
 
 def escape_md_cell(text: str) -> str:
@@ -271,8 +296,8 @@ def render_timeline_sections(
         "**Effort** includes **Task** and **Sub-task** issue types only (bugs excluded).  ",
         "Bug effort is in **Bug fix effort** below (same file).",
         "",
-        "**Calc days** = ceil((Efforts + Planned Leave + Unplanned Delays) / (Resources × 6h)).  ",
-        "**Start/End** = min/max scheduled dates for Jira work in that row.",
+        "**Calc days** = ceil((Efforts + Leave) / (Resources × 6h)).  ",
+        "**Start/End** are placeholders (—); sprint-window dates are deferred.",
         "",
     ]
 
@@ -280,40 +305,21 @@ def render_timeline_sections(
         epic_key = epic.get("epicKey", "")
         prd = escape_md_cell(epic.get("prdName") or epic_key)
         epic_link = jira_issue_link(jira_site_url, epic_key)
-        d_start = _fmt_date(epic.get("deliveryStart"))
-        d_end = _fmt_date(epic.get("deliveryEnd"))
-        cal_days = epic.get("calendarDeliveryDays")
-        cal_s = f" | Calendar days: {cal_days}" if cal_days else ""
+        exec_stages = epic.get("executionStages") or {}
 
         lines.append(f'<span id="{epic_prd_anchor(epic_key)}"></span>')
         lines.append("")
         lines.append(f"### {epic_link} — {prd}")
-        lines.append(f"- Epic delivery window: {d_start} → {d_end}{cal_s}")
-        exec_stages = epic.get("executionStages") or {}
-        for plat_key, label in (
-            ("backend", "Backend"),
-            ("frontend", "Web"),
-            ("mobile", "Mobile"),
-        ):
-            block = exec_stages.get(plat_key)
-            if not block:
-                continue
-            p_start = _fmt_date(block.get("deliveryStart"))
-            p_end = _fmt_date(block.get("deliveryEnd"))
-            p_go = _fmt_date(block.get("goLive"))
-            lines.append(
-                f"- **{label}** platform: {p_start} → {p_end} | Go live: {p_go}"
-            )
+        # Epic delivery window and per-platform delivery/go-live lines are
+        # date-only; dates are deferred, so these lines are omitted for now.
         lines.append("")
         lines.append("#### Teams plan")
         lines.append("")
         lines.append(
-            "| Team | Peak resources | Total effort (h) | Planned leave (h) | "
-            "Unplanned delay (h) | Tasks |"
+            "| Team | Peak resources | Total effort (h) | Leave (h) | Tasks |"
         )
         lines.append(
-            "|------|----------------|------------------|-------------------|"
-            "---------------------|-------|"
+            "|------|----------------|------------------|-----------|-------|"
         )
         team_order = ("Backend", "Web", "Mobile", "QA", "Other")
         summary_by_side = epic.get("teamSummary") or {}
@@ -321,11 +327,13 @@ def render_timeline_sections(
             summary = summary_by_side.get(side)
             if not summary:
                 continue
+            combined_leave = (summary.get("totalLeaveHours") or 0) + (
+                summary.get("totalDelayHours") or 0
+            )
             lines.append(
                 f"| {side} | {_fmt_resources(summary.get('peakResources'))} | "
                 f"{_fmt_hours(summary.get('totalEffortHours'))} | "
-                f"{_fmt_hours(summary.get('totalLeaveHours'))} | "
-                f"{_fmt_hours(summary.get('totalDelayHours'))} | "
+                f"{_fmt_hours(combined_leave or None)} | "
                 f"{summary.get('taskCount', 0)} |"
             )
         members_by_side = epic.get("membersBySide") or {}
@@ -350,27 +358,20 @@ def render_timeline_sections(
                 calc = m.get("calculatedDays")
                 calc_s = str(calc) if calc is not None else "—"
                 tasks_s = escape_md_cell(", ".join(m.get("tasks") or [])[:80]) or "—"
-                issues_s = ", ".join(m.get("issueKeys") or [])[:60]
-                if len(m.get("issueKeys") or []) > 4:
-                    issues_s += "…"
+                issues_s = jira_issue_keys_linked(jira_site_url, m.get("issueKeys"))
                 lines.append(
                     f"| {escape_md_cell(m.get('member', ''))} | "
                     f"{_fmt_hours(m.get('effortsHours'))} | "
                     f"{_fmt_hours(m.get('plannedLeaveHours'))} | "
                     f"{_fmt_hours(m.get('unplannedDelayHours'))} | "
-                    f"{_fmt_date(m.get('start'))} | {_fmt_date(m.get('end'))} | {calc_s} | "
-                    f"{escape_md_cell(issues_s)} | {tasks_s} |"
+                    f"— | — | {calc_s} | "
+                    f"{issues_s} | {tasks_s} |"
                 )
-        lines.append("")
-        lines.append("#### Execution stages")
-        lines.append("")
         stage_header = (
-            "| Stage | Resources | Efforts (h) | Leave (h) | Delay (h) | "
-            "Start | End | Calc days |"
+            "| Stage | Resources | Efforts (h) | Leave (h) | Start | End | Calc days |"
         )
         stage_sep = (
-            "|-------|-----------|-------------|-----------|-----------|"
-            "-------|-----|-----------|"
+            "|-------|-----------|-------------|-----------|-------|-----|-----------|"
         )
 
         def _render_stage_table(stage_rows: list[dict[str, Any]]) -> None:
@@ -383,49 +384,47 @@ def render_timeline_sections(
                 stage_label = row.get("stage", "")
                 if src == "synthetic":
                     stage_label = f"{stage_label} (est.)"
+                combined_leave = (row.get("plannedLeaveHours") or 0) + (
+                    row.get("unplannedDelayHours") or 0
+                )
                 lines.append(
                     f"| {escape_md_cell(stage_label)} | "
                     f"{_fmt_resources(row.get('resources'))} | "
                     f"{_fmt_hours(row.get('effortsHours'))} | "
-                    f"{_fmt_hours(row.get('plannedLeaveHours'))} | "
-                    f"{_fmt_hours(row.get('unplannedDelayHours'))} | "
-                    f"{_fmt_date(row.get('start'))} | {_fmt_date(row.get('end'))} | {calc_s} |"
+                    f"{_fmt_hours(combined_leave or None)} | "
+                    f"— | — | {calc_s} |"
                 )
             lines.append("")
 
-        if exec_stages:
+        platform_blocks = [
+            (label, exec_stages.get(plat_key))
             for plat_key, label in (
                 ("backend", "Backend"),
                 ("frontend", "Web"),
                 ("mobile", "Mobile"),
-            ):
-                block = exec_stages.get(plat_key)
-                if not block or not block.get("stages"):
-                    continue
+            )
+        ]
+        active_platforms = [
+            (label, block)
+            for label, block in platform_blocks
+            if block and block.get("hasWork") and block.get("stages")
+        ]
+        qa_x = epic.get("qaCrossPlatform") or {}
+        qa_rows = qa_x.get("stages") or []
+        qa_has_effort = bool(qa_rows) and any(r.get("effortsHours") for r in qa_rows)
+
+        if active_platforms or qa_has_effort:
+            lines.append("")
+            lines.append("#### Execution stages")
+            lines.append("")
+            for label, block in active_platforms:
                 lines.append(f"**{label}**")
                 lines.append("")
                 _render_stage_table(block["stages"])
-            qa_x = epic.get("qaCrossPlatform") or {}
-            qa_rows = qa_x.get("stages") or []
-            if qa_rows and any(r.get("effortsHours") for r in qa_rows):
+            if qa_has_effort:
                 lines.append("**QA (all platforms)**")
                 lines.append("")
                 _render_stage_table(qa_rows)
-        else:
-            lines.append(stage_header)
-            lines.append(stage_sep)
-            for row in epic.get("tasks") or []:
-                calc = row.get("calculatedDays")
-                calc_s = str(calc) if calc is not None else "—"
-                lines.append(
-                    f"| {escape_md_cell(row.get('task', ''))} | "
-                    f"{_fmt_resources(row.get('resources'))} | "
-                    f"{_fmt_hours(row.get('effortsHours'))} | "
-                    f"{_fmt_hours(row.get('plannedLeaveHours'))} | "
-                    f"{_fmt_hours(row.get('unplannedDelayHours'))} | "
-                    f"{_fmt_date(row.get('start'))} | {_fmt_date(row.get('end'))} | {calc_s} |"
-                )
-            lines.append("")
 
         unmapped = epic.get("unmapped") or []
         if unmapped:
@@ -462,7 +461,7 @@ def render_bug_sections(
     for epic in bug_data:
         epic_key = epic.get("epicKey", "")
         prd = escape_md_cell(epic.get("prdName") or epic_key)
-        epic_id = jira_issue_link(jira_site_url, epic_key) if jira_site_url else epic_key
+        epic_id = jira_issue_link(jira_site_url, epic_key)
         by_side = _bug_hours_by_side(epic)
         cells = []
         for col in BUG_FIX_SIDE_COLUMNS:
@@ -670,6 +669,8 @@ def render_report(
     config: dict[str, Any] | None = None,
     prior_schedule: dict[str, Any] | None = None,
 ) -> str:
+    jira_site_url = resolve_jira_site_url(jira_site_url, config)
+
     issue_by_key = {i["key"]: i for i in issues}
     est_by_key = {x["key"]: x.get("estimateSeconds", 0) for x in engine.get("items", [])}
     engine_items = engine.get("items", [])

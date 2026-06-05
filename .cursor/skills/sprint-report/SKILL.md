@@ -16,7 +16,11 @@ disable-model-invocation: true
 
 Report shape and sections are produced by `scripts/render_report.py` (not hand-authored markdown). Status rules: `.cursor/rules/schedule-engine.mdc`.
 
-**Timeline:** **Execution stages** — separate tables per Backend/Web/Mobile platform (ordered pipeline + synthetic bug/final-test buffers) plus **QA (all platforms)** for cross-cutting test planning. Platform delivery windows and go-live lines appear under each epic.
+**Jira links:** every issue key in tables (Epic, Key, Ticket, Issues, Schedule Delta, etc.) renders as a markdown browse link (`[VP-20013]({jira.siteUrl}/browse/VP-20013)`). `jira.siteUrl` comes from `em-config.yaml` (or `--jira-site-url`).
+
+**Sprint window rule:** the report covers the complete active sprint (sprint start → end) across all statuses (closed, deferred, etc.); each section applies its own status condition.
+
+**Timeline:** **Execution stages** — separate tables per Backend/Web/Mobile platform (ordered pipeline + synthetic bug/final-test buffers) plus **QA (all platforms)** for cross-cutting test planning. A platform with no Jira tasks is omitted (no empty stage table). Stage/member `Leave (h)` combines planned + unplanned; the execution-stage `Delay (h)` column is removed. `Start`/`End` render as `—` placeholders and the epic/platform delivery-window + go-live lines are omitted — calendar dates are **deferred** (sprint-window date rule to be added later).
 
 ## Bug fix effort
 

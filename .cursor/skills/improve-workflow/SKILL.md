@@ -61,6 +61,8 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`em-orchest
 
 ## Changelog
 
+- 2026-06-05 — Report: all Jira issue keys render as browse links via `jira.siteUrl` (`resolve_jira_site_url`, timeline Issues column, bug Epic ID); sprint-report skill updated.
+- 2026-06-05 — Sprint window rule (all statuses, sprint start→end); Teams plan team summary uses a single combined `Leave (h)` (planned+unplanned) while the member breakdown keeps detailed Planned leave + Unplanned delay; execution-stage `Delay (h)` column removed (folded into combined `Leave (h)`); execution stages omit platforms with no Jira tasks (`hasWork`); all timeline `Start`/`End` render as `—` and epic/platform delivery-window + go-live + calendar-day lines removed — **calendar dates deferred** (sprint-window date rule to be implemented later).
 - 2026-06-03 — Execution stages: per-platform pipelines (Backend/Web/Mobile), QA cross-platform Test planning, prefix `| Assessment` mapping, `QA | Web/Mobile/BE` streams, synthetic Bug fixes / Stage final testing buffers, separate Pre-Prod/UAT/Ready for release and Prod release/Prod final testing; report section renamed from Task breakdown.
 - 2026-06-03 — Epic sort: Jira Rank (LexoRank / `fields.rank`) for Delivery items, Timeline, and Bug fix effort; shared `epic_jira_sort_key` in `jira_normalize.py`.
 - 2026-06-03 — Delivery items sort: PRD-titled epics first, then nearest due date (`delivery_epic_sort_key`). *(superseded by Jira Rank sort)*

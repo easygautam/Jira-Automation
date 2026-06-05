@@ -171,8 +171,10 @@ def build_members_by_side(
             and not data["issueKeys"]
         ):
             continue
-        start = min(data["starts"]) if data["starts"] else None
-        end = max(data["ends"]) if data["ends"] else None
+        # Start/End dates deferred (sprint-window rule to be implemented later);
+        # rendered as placeholders.
+        start = None
+        end = None
         calc = calc_days(
             data["effortsHours"],
             data["plannedLeaveHours"],
@@ -450,8 +452,9 @@ def _stage_to_row(
     hours_per_day: float,
 ) -> dict[str, Any]:
     resources = float(len(bucket["resources"])) if bucket["resources"] else 0.0
-    start = min(bucket["starts"]) if bucket["starts"] else None
-    end = max(bucket["ends"]) if bucket["ends"] else None
+    # Start/End dates deferred (sprint-window rule to be implemented later).
+    start = None
+    end = None
     calc = calc_days(
         bucket["effortsHours"],
         bucket["plannedLeaveHours"],
@@ -497,12 +500,14 @@ def _build_platform_block(
     delivery_end = max(dated_ends) if dated_ends else None
     if not go_live:
         go_live = delivery_end
+    has_work = any(b["issueKeys"] for b in buckets.values())
     return {
         "platform": platform,
         "side": PLATFORM_SIDE[platform],
         "deliveryStart": delivery_start,
         "deliveryEnd": delivery_end,
         "goLive": go_live,
+        "hasWork": has_work,
         "stages": stages_out,
     }
 
