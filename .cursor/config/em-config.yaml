@@ -1,10 +1,13 @@
 # Engineering Manager workflow configuration
-# Fill projectKey (and optionally cloudId) before first live Jira run.
+# Consumed by scripts/sprintkit (loaded via sprintkit/config.py) and the
+# /sprint-report pipeline. Fill projectKey (and optionally cloudId) before the
+# first live Jira run. Resolve an empty cloudId with Atlassian MCP
+# getAccessibleAtlassianResources.
 
 jira:
   cloudId: "ba5d328f-f4a3-4652-ba4d-aba5e33ecabd"
-  siteUrl: https://physicswallah001.atlassian.net
-  projectKey: "VP"             # Replace with your Jira project key
+  siteUrl: https://physicswallah001.atlassian.net   # Base URL for clickable issue links
+  projectKey: "VP"             # Jira project key (substituted into activeSprintJql)
   boardId: 189                  # Optional; for board-scoped queries
   activeSprintJql: 'project = {projectKey} AND sprint in openSprints()'
   sprintDiscovery:

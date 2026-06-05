@@ -41,7 +41,7 @@ project = {projectKey} AND sprint in openSprints() AND timeoriginalestimate is E
 2. Discover Sprint field via `getJiraIssueTypeMetaWithFields` if needed → `fields.sprint` in config
 3. `searchJiraIssuesUsingJql` paginated (`maxResults=100`, `nextPageToken`)
 4. Fields: `summary, status, assignee, priority, issuetype, parent, timeoriginalestimate, timespent, created, updated, resolutiondate, labels, components, {fields.sprint}, {fields.rank}` (see `fields` in config)
-5. Write `scripts/.tmp/issues.json` → `sprint_meta.py` → `sprint-meta.json` (do not infer sprint dates)
+5. Write `scripts/.tmp/issues.json`; the pipeline derives the active sprint window (`scripts/sprintkit/sprint_window.py`) — do not infer sprint dates
 
 ## Leave tasks (timeline)
 
@@ -49,4 +49,4 @@ Leave tasks: summary starts with `Leave |` (see `timeline.leaveTaskPrefixes`). `
 
 ## Team from summary
 
-First `|` segment only → `jira_teams.py` + `teamPrefixMapping` in config. Unmatched or no pipe → **Other**. QA on `QA | APP | …` is QA, not Mobile. Assessment tasks: `{prefix} | Assessment` → platform Assessment; `QA | Assessment` → cross-platform test planning. `qa_platform_stream()` scopes `QA | Web/Mobile/BE` to frontend/mobile/backend. Full alias list lives in config, not duplicated here.
+First `|` segment only → `scripts/sprintkit/teams.py` + `teamPrefixMapping` in config. Unmatched or no pipe → **Other**. QA on `QA | APP | …` is QA, not Mobile. Stage/leave mapping lives in `scripts/sprintkit/stages.py`: `{prefix} | Assessment` → platform Assessment; `QA | Assessment` → cross-platform test planning; `qa_platform_stream()` scopes `QA | Web/Mobile/BE` to frontend/mobile/backend. Full alias list lives in config, not duplicated here.

@@ -9,19 +9,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from render_report import (  # noqa: E402
+from sprintkit.render.markdown import (  # noqa: E402
     epic_prd_anchor,
     epic_title_link,
-    jira_issue_link,
     jira_issue_keys_linked,
+    jira_issue_link,
+)
+from sprintkit.render.report import render_report  # noqa: E402
+from sprintkit.render.sections import (  # noqa: E402
     phase_for_epic,
     render_bug_sections,
     render_data_quality_section,
-    render_report,
     render_schedule_delta_section,
     render_team_tasks_plan,
     render_timeline_sections,
-    schedule_member_anchor,
 )
 
 JIRA_SITE = "https://physicswallah001.atlassian.net"
@@ -81,10 +82,7 @@ class TestJiraIssueLinks(unittest.TestCase):
         self.assertTrue(linked.endswith("…"))
 
 
-class TestScheduleAnchor(unittest.TestCase):
-    def test_slug(self):
-        self.assertEqual(schedule_member_anchor("Aman Gupta"), "aman-gupta")
-
+class TestAnchors(unittest.TestCase):
     def test_epic_prd_anchor(self):
         self.assertEqual(epic_prd_anchor("VP-19350"), "prd-vp-19350")
 
@@ -143,7 +141,7 @@ class TestTeamTasksPlan(unittest.TestCase):
 
 
 class TestBugEffortTable(unittest.TestCase):
-    def test_epic_side_columns_and_member_without_team(self):
+    def test_epic_side_columns_reconcile_to_total(self):
         bug_data = [
             {
                 "epicKey": "VP-2",
@@ -151,29 +149,23 @@ class TestBugEffortTable(unittest.TestCase):
                 "totalBugHours": 3.0,
                 "bugCount": 2,
                 "members": [
-                    {
-                        "member": "Alice",
-                        "effortsHours": 2.0,
-                        "bugCount": 1,
-                        "sides": ["Backend"],
-                    },
-                    {
-                        "member": "Bob",
-                        "effortsHours": 1.0,
-                        "bugCount": 1,
-                        "sides": ["Web"],
-                    },
+                    {"member": "Alice", "effortsHours": 2.0, "bugCount": 1},
+                    {"member": "Bob", "effortsHours": 1.0, "bugCount": 1},
                 ],
-                "bySide": {},
+                "sideHours": {"Backend": 2.0, "Web": 1.0},
             }
         ]
         body = "\n".join(render_bug_sections(bug_data, JIRA_SITE))
-        self.assertIn("| Epic ID | Epic Name | Backend | Web | Mobile | Bugs |", body)
         self.assertIn(
-            "| [VP-2](https://physicswallah001.atlassian.net/browse/VP-2) | Test PRD | 2.0 | 1.0 | — | 2 |",
+            "| Epic ID | Epic Name | Backend | Web | Mobile | QA | Other | Total | Bugs |",
             body,
         )
-        self.assertNotIn("#### By team", body)
+        self.assertIn(
+            "| [VP-2](https://physicswallah001.atlassian.net/browse/VP-2) "
+            "| Test PRD | 2.0 | 1.0 | — | — | — | 3.0 | 2 |",
+            body,
+        )
+        self.assertIn("**Sprint bug effort total:** 3.0 h (Backend 2.0, Web 1.0", body)
         self.assertIn("| Member | Bug effort (h) | Bug count |", body)
         self.assertNotIn("| Member | Team |", body)
 
@@ -263,11 +255,10 @@ class TestTimelineSectionsRender(unittest.TestCase):
         self.assertIn("| Backend | 1.0 | 8.0 | 3.0 | 1 |", body)
         # Member breakdown keeps both Planned leave + Unplanned delay columns.
         self.assertIn("| Member | Efforts (h) | Planned leave (h) | Unplanned delay (h) |", body)
-        # Execution-stage table has no Delay (h) column and combines leave.
-        self.assertIn(
-            "| Stage | Resources | Efforts (h) | Leave (h) | Start | End | Calc days |", body
-        )
+        # Execution-stage table has no Delay (h) column and combines leave; no Start/End.
+        self.assertIn("| Stage | Resources | Efforts (h) | Leave (h) | Calc days |", body)
         self.assertNotIn("Delay (h)", body)
+        self.assertNotIn("| Start | End |", body)
         self.assertIn(
             "[VP-101](https://physicswallah001.atlassian.net/browse/VP-101)",
             body,
@@ -282,8 +273,8 @@ class TestTimelineSectionsRender(unittest.TestCase):
         # Date-only lines removed.
         self.assertNotIn("Epic delivery window", body)
         self.assertNotIn("Go live", body)
-        # Member Start/End rendered as dash placeholders.
-        self.assertIn("| Alice | 8.0 | 2.0 | 1.0 | — | — | 2 |", body)
+        # Member row: Start/End columns removed; Calc days follows Unplanned delay.
+        self.assertIn("| Alice | 8.0 | 2.0 | 1.0 | 2 |", body)
 
 
 class TestPhaseForEpic(unittest.TestCase):

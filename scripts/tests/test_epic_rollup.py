@@ -1,4 +1,4 @@
-"""Tests for epic rollup in render_report.py"""
+"""Tests for epic rollup helpers used by the Delivery items section."""
 
 import sys
 import unittest
@@ -7,14 +7,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from render_report import (  # noqa: E402
-    compute_epic_rollup,
-    delivery_epic_sort_key,
-    is_prd_epic_title,
-    jira_issue_link,
-    resolve_epic_summary,
-    worst_status,
-)
+from sprintkit.jira_model import epic_jira_sort_key, epic_summary  # noqa: E402
+from sprintkit.render.markdown import jira_issue_link  # noqa: E402
+from sprintkit.render.sections import compute_epic_rollup, worst_status  # noqa: E402
 
 
 class TestEpicRollup(unittest.TestCase):
@@ -48,7 +43,7 @@ class TestEpicRollup(unittest.TestCase):
         )
         self.assertEqual(jira_issue_link(None, "VP-1"), "VP-1")
 
-    def test_resolve_epic_summary_from_parent(self):
+    def test_epic_summary_from_parent(self):
         issues = [
             {
                 "key": "VP-100",
@@ -63,14 +58,8 @@ class TestEpicRollup(unittest.TestCase):
                 },
             }
         ]
-        summary = resolve_epic_summary("VP-19350", issues, {})
+        summary = epic_summary("VP-19350", issues, {})
         self.assertEqual(summary, "Events phase 1 <> PRD")
-
-    def test_is_prd_epic_title(self):
-        self.assertTrue(is_prd_epic_title("Events phase 1 <> PRD"))
-        self.assertTrue(is_prd_epic_title("NSAT Multi category Part 3<>PRD"))
-        self.assertFalse(is_prd_epic_title("Prod Issues AMJ26"))
-        self.assertFalse(is_prd_epic_title("Tech Excellence AMJ26"))
 
     def test_delivery_epic_sort_jira_rank(self):
         issues = [
@@ -105,13 +94,10 @@ class TestEpicRollup(unittest.TestCase):
             {"epicKey": "E2", "startDate": "2026-06-01", "dueDate": "2026-06-12", "status": "delayed"},
             {"epicKey": "E3", "startDate": "2026-06-02", "dueDate": "2026-06-08", "status": "delayed"},
         ]
-        engine_items = [{"key": "T1", "epicKey": "E1"}, {"key": "T2", "epicKey": "E2"}, {"key": "T3", "epicKey": "E3"}]
         config = {"fields": {"rank": "customfield_10019"}}
         order = sorted(
             ["E1", "E2", "E3"],
-            key=lambda k: delivery_epic_sort_key(
-                k, issue_by_key, scheduled, [], engine_items, issues, config=config
-            ),
+            key=lambda k: epic_jira_sort_key(k, issue_by_key, config),
         )
         self.assertEqual(order, ["E2", "E3", "E1"])
 

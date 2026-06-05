@@ -1,67 +1,106 @@
 ---
 name: sprint-report
 description: >-
-  Generate sprint health reports with on-track/delayed analysis and calculated
-  start/due dates. Use for /sprint-report, /daily-standup, or after schedule
-  recalculation.
+  Runbook for the EM sprint report: fetch Jira sprint data and run the single
+  sprint_report pipeline that maps platform/team, leaves, and stages, calculates
+  team effort, and renders six deliverables. Use for /sprint-report, recalculation
+  (Schedule Delta), daily standup, or sprint health questions.
 disable-model-invocation: true
 ---
 
 # Sprint Report
 
-## Workflow
+One agent (`sprint-analyst`) and one command (`/sprint-report`) drive the whole workflow. The pipeline (`scripts/sprint_report.py` → `scripts/sprintkit/`) owns all mapping and date math; never hand-author report markdown or compute dates in prose.
 
-1. Run `.cursor/skills/em-orchestrator/SKILL.md` through REPORT
-2. Save `reports/sprint-{YYYY-MM-DD}.md`; summarize on_track / at_risk / delayed / blocked in chat
+## Protocol
 
-Report shape and sections are produced by `scripts/render_report.py` (not hand-authored markdown). Status rules: `.cursor/rules/schedule-engine.mdc`.
+```
+PLAN → FETCH (Load) → RUN (map + calculate + render) → REPORT
+```
 
-**Jira links:** every issue key in tables (Epic, Key, Ticket, Issues, Schedule Delta, etc.) renders as a markdown browse link (`[VP-20013]({jira.siteUrl}/browse/VP-20013)`). `jira.siteUrl` comes from `em-config.yaml` (or `--jira-site-url`).
+### PLAN
 
-**Sprint window rule:** the report covers the complete active sprint (sprint start → end) across all statuses (closed, deferred, etc.); each section applies its own status condition.
+1. Read `.cursor/config/em-config.yaml`.
+2. Confirm `projectKey`; resolve `cloudId` via Atlassian MCP if empty.
+3. Pick mode: full report | `--recalc` (Schedule Delta) | `--standup` (chat only). If recalculating and the change is unknown, ask: priority / add / remove / reassignment.
 
-**Timeline:** **Execution stages** — separate tables per Backend/Web/Mobile platform (ordered pipeline + synthetic bug/final-test buffers) plus **QA (all platforms)** for cross-cutting test planning. A platform with no Jira tasks is omitted (no empty stage table). Stage/member `Leave (h)` combines planned + unplanned; the execution-stage `Delay (h)` column is removed. `Start`/`End` render as `—` placeholders and the epic/platform delivery-window + go-live lines are omitted — calendar dates are **deferred** (sprint-window date rule to be added later).
+### FETCH — Step 1 (Load sprint items)
 
-## Bug fix effort
+Follow `.cursor/skills/jira-domain/SKILL.md`:
 
-- Summary table: all sprint epics — Epic ID, Epic Name, Backend, Web, Mobile, Bugs (worklog hours; — when none)
-- Per-epic member tables: Member, Bug effort (h), Bug count (no team column)
+1. `getAccessibleAtlassianResources` when `cloudId` empty.
+2. Discover the Sprint field (`getJiraIssueTypeMetaWithFields`) if needed → `fields.sprint` in config.
+3. `searchJiraIssuesUsingJql` with the sprint JQL (substitute `{projectKey}`); include `fields.sprint` and `fields.rank`.
+4. Paginate until all issues are fetched.
+5. Write raw issues to `scripts/.tmp/issues.json`.
 
-## Team tasks plan
+The active sprint window is derived from the Jira sprint field inside the pipeline (`scripts/sprintkit/sprint_window.py`) — do not infer sprint dates.
 
-- Per-assignee scheduled task tables (Key, Task title, Epic, Effort, Status); replaces former Schedule by assignee index
+### RUN — Steps 2–5 + render
 
-## Data quality flags
+A single command maps each task to platform/team (Step 2), maps leave tasks (Step 3), maps each task to a stage (Step 4), calculates team effort per stage (Step 5), and renders the six deliverables:
 
-- Reason summary table at section top; one row per ticket (multiple reasons joined with `;`)
-- Tasks/sub-tasks: `Missing estimates` when Original Estimate empty
-- Bugs in To Do / In Progress / Hold / Deferred: no time-related flag
-- Bugs in Not a Bug (config: `bugNoWorklogStatuses`): no worklog flag
-- Other resolved bugs need worklog or get `Missing logged time`
-- Recommended actions split task estimates vs bug worklog counts
+```bash
+python scripts/sprint_report.py \
+  --issues scripts/.tmp/issues.json \
+  --config .cursor/config/em-config.yaml \
+  --project {projectKey}
+```
 
-## Schedule Delta (recalculate)
+The command writes `reports/sprint-{YYYY-MM-DD}.md` and prints a JSON summary (status counts, scheduled/unscheduled, sprint window). It also snapshots pipeline JSON under `scripts/.tmp/` (`sprint-meta`, `engine-input`, `schedule`, `timeline-breakdown`, `bug-effort-breakdown`) for debugging and recalculation continuity.
 
-When `scripts/.tmp/prior-schedule.json` exists, report includes date/status changes vs current schedule.
+**Options**
 
-## Epic rollup (delivery items)
+| Flag | Effect |
+|------|--------|
+| `--recalc` | Snapshot the existing `scripts/.tmp/schedule.json` as `prior-schedule.json` and add a **Schedule Delta** section |
+| `--prior-schedule PATH` | Use an explicit prior schedule for the delta |
+| `--standup` | Print a short standup summary to chat (blockers, overdue, at-risk); report saved only with `--output` |
+| `--sprint-start / --sprint-end` | Manual sprint-window override when the Jira field is unavailable |
+| `--today YYYY-MM-DD` | Deterministic "today" for reproducible runs |
+| `--output PATH` | Override the report path |
 
-- **Start** = earliest child task `startDate`; **Due** = latest child `dueDate`
-- **Status** = worst child (blocked > delayed > at_risk > on_track); **TBD** if unscheduled
-- **Sort:** Jira **Rank** field (LexoRank / board drag-and-drop order; `fields.rank` in config)
-- **Title** links to that epic's PRD block in Timeline breakdown (`#prd-{epicKey}`) when timeline data exists
+### REPORT
 
-## Standup mode (`/daily-standup`)
+Summarize on_track / at_risk / delayed / blocked in chat and link the saved report. Status rules: `.cursor/rules/schedule-engine.mdc`.
 
-Same pipeline; shorter chat output (blockers, overdue, due today, talking points per assignee).
+## Six deliverables (report order)
+
+Executive summary → **Delivery items (Epics)** → **Teams plan** → **Member breakdown** → **Execution stages** → **Bug fix effort** → **Team tasks plan** → Data quality flags → Recommended actions (→ Schedule Delta when a prior snapshot exists).
+
+- **Delivery items:** Start = earliest child `startDate`, Due = latest child `dueDate`, Status = worst child (blocked > delayed > at_risk > on_track), TBD if unscheduled. Sorted by Jira **Rank** (LexoRank / board order, `fields.rank`). Title links to the epic's PRD block in Timeline breakdown (`#prd-{epicKey}`).
+- **Teams plan / Member breakdown / Execution stages:** effort is **Task + Sub-task only** (bugs excluded), 6h/day (`timeline.hoursPerDay`). `Calc days = ceil((Efforts + Leave) / (Resources × 6h))`. Stage/member `Leave (h)` combines planned + unplanned. Platforms with no Jira tasks are omitted. Calendar dates are **deferred** — there are no Start/End columns (sprint-window date rule to be added later).
+- **Bug fix effort:** Jira **Bug** issues, worklog **time spent**; columns Backend / Web / Mobile / QA / Other / **Total** / Bugs — each bug counts once on its team's side and the columns reconcile to Total. Per-epic member tables (Member, Bug effort, Bug count).
+- **Team tasks plan:** per-assignee scheduled tasks (Key, Task title, Epic, Effort, Status); dates are engine-calculated.
+- **Data quality flags:** reason summary table + one consolidated row per ticket. Tasks/sub-tasks flag `Missing estimates`; bugs in active statuses (`dataQuality.bugActiveStatuses`) skip time flags; `bugNoWorklogStatuses` (Not a Bug) skip worklog checks; other resolved bugs need worklog or get `Missing logged time`.
+- **Jira links:** every issue key renders as a browse link from `jira.siteUrl` (or `--jira-site-url`).
+
+## Schedule engine I/O (per assignee)
+
+Sort order (scheduled first): epic priority rank → story rank → created date. On **recalculate**, the priority change re-sorts the member's queue and cascades new start/due dates for that task and all following tasks.
+
+Input items carry `key, storyKey, epicKey, assignee, estimateSeconds, epicPriorityRank, storyRank, team, created, blocked, dependencies[]`. Output: `scheduled[] (startDate, dueDate, durationDays, status)`, `violations` (always empty — unscheduled dependencies are not flagged), `unscheduled[] (reason)`. Duration/dependency/status rules: `.cursor/rules/schedule-engine.mdc` and `scripts/sprintkit/schedule.py`.
 
 ## Dry-run (no Jira)
 
 ```bash
-python scripts/sprint_meta.py --input scripts/fixtures/sample_issues_with_sprint.json --output scripts/.tmp/sprint-meta.json
-python scripts/jira_normalize.py --input scripts/fixtures/sample_issues.json --sprint-meta scripts/.tmp/sprint-meta.json --output scripts/.tmp/engine-input.json
-python scripts/schedule_engine.py scripts/.tmp/engine-input.json > scripts/.tmp/schedule.json
-python scripts/timeline_breakdown.py --issues scripts/fixtures/sample_issues.json --schedule scripts/.tmp/schedule.json --output scripts/.tmp/timeline-breakdown.json
-python scripts/bug_effort_breakdown.py --issues scripts/fixtures/sample_issues.json --schedule scripts/.tmp/schedule.json --output scripts/.tmp/bug-effort-breakdown.json
-python scripts/render_report.py --sprint-meta scripts/.tmp/sprint-meta.json --timeline-breakdown scripts/.tmp/timeline-breakdown.json --bug-breakdown scripts/.tmp/bug-effort-breakdown.json
+python scripts/sprint_report.py \
+  --issues scripts/tests/fixtures/mini_issues.json \
+  --project VP --today 2026-06-05 \
+  --jira-site-url https://example.atlassian.net \
+  --output /tmp/sprint-dry-run.md
 ```
+
+## Error handling
+
+| Condition | Action |
+|-----------|--------|
+| MCP auth failure | Prompt the user to authenticate the Atlassian plugin |
+| Empty sprint | Report "no issues" with the JQL used |
+| Sprint window unresolved | Re-fetch including the sprint field, or pass `--sprint-start/--sprint-end` |
+| All unscheduled | List keys with missing estimates from the JSON summary |
+
+## Related skills
+
+- `jira-domain` — hierarchy, JQL, MCP fetch, team-from-summary
+- `delivery-flow` — phases, execution stages, dependencies

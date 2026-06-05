@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from sprint_meta import extract_active_sprint  # noqa: E402
+from sprintkit.sprint_window import extract_active_sprint  # noqa: E402
 
 
 class TestSprintMeta(unittest.TestCase):

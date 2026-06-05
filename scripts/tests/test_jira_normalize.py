@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from jira_normalize import (  # noqa: E402
+from sprintkit.jira_model import (  # noqa: E402
     bug_missing_logged_time,
     build_index,
     count_unscheduled_breakdown,

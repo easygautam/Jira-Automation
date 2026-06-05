@@ -9,14 +9,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from timeline_breakdown import (  # noqa: E402
+from sprintkit.stages import (  # noqa: E402
     STAGE_DEVELOPMENT,
     STAGE_STAGE_TESTING,
     STAGE_TEST_PLANNING,
-    build_timeline_breakdown,
-    calc_days,
     classify_issue,
 )
+from sprintkit.timeline import build_timeline_breakdown, calc_days  # noqa: E402
 
 
 def _issue(
@@ -184,13 +183,13 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         }
         result = build_timeline_breakdown([epic, t1, t2], schedule, MINIMAL_CONFIG)
         epic_row = result[0]
-        # Calendar dates are deferred — all start/end resolve to None.
-        self.assertIsNone(epic_row["deliveryStart"])
-        self.assertIsNone(epic_row["deliveryEnd"])
+        # Calendar dates are intentionally not produced (no delivery date fields).
+        self.assertNotIn("deliveryStart", epic_row)
+        self.assertNotIn("deliveryEnd", epic_row)
 
         be_row = _stage_row(epic_row, "backend", STAGE_DEVELOPMENT)
-        self.assertIsNone(be_row["start"])
-        self.assertIsNone(be_row["end"])
+        self.assertNotIn("start", be_row)
+        self.assertNotIn("end", be_row)
         self.assertEqual(be_row["effortsHours"], 8.0)
         bug_row = _stage_row(epic_row, "backend", "Bug fixes")
         self.assertEqual(bug_row["effortsHours"], 0.8)
@@ -251,10 +250,10 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         result = build_timeline_breakdown([epic, t1, t2], schedule, MINIMAL_CONFIG)
         backend_members = result[0]["membersBySide"]["Backend"]
         self.assertEqual(len(backend_members), 2)
-        # Member Start/End dates are deferred (rendered as placeholders).
+        # Member rows no longer carry start/end (calendar dates not produced).
         for member in backend_members:
-            self.assertIsNone(member["start"])
-            self.assertIsNone(member["end"])
+            self.assertNotIn("start", member)
+            self.assertNotIn("end", member)
 
     def test_qa_test_planning_not_tripled(self):
         epic = _epic("VP-700")

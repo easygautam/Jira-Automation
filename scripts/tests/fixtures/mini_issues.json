@@ -1,0 +1,91 @@
+[
+  {
+    "key": "VP-900",
+    "fields": {
+      "summary": "Demo Feature <> PRD",
+      "issuetype": { "name": "Epic", "hierarchyLevel": 1 },
+      "priority": { "name": "High" },
+      "status": { "name": "In Progress" },
+      "customfield_10019": "0|i00001:",
+      "customfield_10020": [
+        {
+          "id": 99,
+          "name": "Demo Sprint",
+          "state": "active",
+          "startDate": "2026-06-01T00:00:00.000Z",
+          "endDate": "2026-06-12T23:59:59.000Z"
+        }
+      ]
+    }
+  },
+  {
+    "key": "VP-901",
+    "fields": {
+      "summary": "BE | Build ingestion API",
+      "issuetype": { "name": "Task" },
+      "status": { "name": "In Progress" },
+      "timeoriginalestimate": 28800,
+      "assignee": { "displayName": "Alice Backend", "accountId": "acc-alice" },
+      "parent": { "key": "VP-900", "fields": { "issuetype": { "name": "Epic" }, "summary": "Demo Feature <> PRD" } },
+      "customfield_10020": [
+        { "id": 99, "name": "Demo Sprint", "state": "active", "startDate": "2026-06-01T00:00:00.000Z", "endDate": "2026-06-12T23:59:59.000Z" }
+      ]
+    }
+  },
+  {
+    "key": "VP-902",
+    "fields": {
+      "summary": "Web | Build dashboard",
+      "issuetype": { "name": "Task" },
+      "status": { "name": "In Progress" },
+      "timeoriginalestimate": 14400,
+      "assignee": { "displayName": "Bob Web", "accountId": "acc-bob" },
+      "parent": { "key": "VP-900", "fields": { "issuetype": { "name": "Epic" }, "summary": "Demo Feature <> PRD" } }
+    }
+  },
+  {
+    "key": "VP-903",
+    "fields": {
+      "summary": "QA | WEB | 1st iteration (stage testing)",
+      "issuetype": { "name": "Test Execution" },
+      "status": { "name": "In QA" },
+      "timeoriginalestimate": 7200,
+      "assignee": { "displayName": "Carol QA", "accountId": "acc-carol" },
+      "parent": { "key": "VP-900", "fields": { "issuetype": { "name": "Epic" }, "summary": "Demo Feature <> PRD" } }
+    }
+  },
+  {
+    "key": "VP-904",
+    "fields": {
+      "summary": "Leave | Planned - holiday",
+      "issuetype": { "name": "Task" },
+      "status": { "name": "To Do" },
+      "timeoriginalestimate": 7200,
+      "assignee": { "displayName": "Alice Backend", "accountId": "acc-alice" },
+      "parent": { "key": "VP-900", "fields": { "issuetype": { "name": "Epic" }, "summary": "Demo Feature <> PRD" } }
+    }
+  },
+  {
+    "key": "VP-905",
+    "fields": {
+      "summary": "Web | Login fails on submit",
+      "issuetype": { "name": "Bug" },
+      "status": { "name": "Ready For QA" },
+      "timeoriginalestimate": 0,
+      "timespent": 3600,
+      "assignee": { "displayName": "Bob Web", "accountId": "acc-bob" },
+      "parent": { "key": "VP-900", "fields": { "issuetype": { "name": "Epic" }, "summary": "Demo Feature <> PRD" } }
+    }
+  },
+  {
+    "key": "VP-906",
+    "fields": {
+      "summary": "Investigate flaky pipeline",
+      "issuetype": { "name": "Task" },
+      "status": { "name": "In Progress" },
+      "timeoriginalestimate": 3600,
+      "assignee": { "displayName": "Dave Ops", "accountId": "acc-dave" },
+      "parent": { "key": "VP-900", "fields": { "issuetype": { "name": "Epic" }, "summary": "Demo Feature <> PRD" } }
+    }
+  }
+]

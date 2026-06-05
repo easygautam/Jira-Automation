@@ -1,11 +1,11 @@
 ---
-description: Schedule calculation constants — must match scripts/schedule_engine.py
+description: Schedule calculation constants — must match scripts/sprintkit/schedule.py
 alwaysApply: true
 ---
 
 # Schedule Engine Constants
 
-Do not recalculate dates in prose; run `scripts/schedule_engine.py`.
+Do not recalculate dates in prose; run the pipeline (`scripts/sprint_report.py`; engine in `scripts/sprintkit/schedule.py`).
 
 | Rule | Value |
 |------|-------|
@@ -17,7 +17,7 @@ Do not recalculate dates in prose; run `scripts/schedule_engine.py`.
 | BE → Mobile/Web | Mobile/Web start ≥ BE due date |
 | BE → QA API work | QA API validation start ≥ BE due date |
 
-Effort source: sum `timeoriginalestimate` on Tasks/Sub-tasks per Story, assignee-wise. **Bug** issues use `timespent` when Original Estimate is empty (see `effective_estimate_seconds` in `jira_normalize.py`).
+Effort source: sum `timeoriginalestimate` on Tasks/Sub-tasks per Story, assignee-wise. **Bug** issues use `timespent` when Original Estimate is empty (see `effective_estimate_seconds` in `scripts/sprintkit/jira_model.py`).
 
 Status classification (post-engine):
 

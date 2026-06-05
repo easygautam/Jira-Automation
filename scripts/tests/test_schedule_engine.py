@@ -9,7 +9,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from schedule_engine import (  # noqa: E402
+from sprintkit.schedule import (  # noqa: E402
     add_business_days,
     compute_schedule,
     duration_days,

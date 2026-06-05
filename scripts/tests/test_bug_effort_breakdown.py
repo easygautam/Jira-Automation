@@ -9,12 +9,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from bug_effort_breakdown import build_bug_effort_breakdown  # noqa: E402
-from timeline_breakdown import (  # noqa: E402
-    build_timeline_breakdown,
-    is_bug_issue,
-    is_task_or_subtask,
-)
+from sprintkit.bugs import build_bug_effort_breakdown  # noqa: E402
+from sprintkit.jira_model import is_bug_issue, is_task_or_subtask  # noqa: E402
+from sprintkit.timeline import build_timeline_breakdown  # noqa: E402
 
 
 def _issue(
@@ -184,7 +181,7 @@ class TestBugEffortBreakdown(unittest.TestCase):
         self.assertIsNone(empty["totalBugHours"])
         self.assertEqual(empty["members"], [])
 
-    def test_by_side_totals(self):
+    def test_side_hours_totals(self):
         epic = _epic("VP-3")
         b1 = _issue(
             "VP-30",
@@ -196,10 +193,11 @@ class TestBugEffortBreakdown(unittest.TestCase):
         )
         b1["fields"]["timespent"] = 3600
         result = build_bug_effort_breakdown([epic, b1], {"scheduled": []}, CONFIG)
-        by_side = result[0]["bySide"]
-        self.assertTrue(by_side)
-        total_side = sum(v.get("totalEffortHours") or 0 for v in by_side.values())
-        self.assertEqual(total_side, 1.0)
+        side_hours = result[0]["sideHours"]
+        self.assertTrue(side_hours)
+        # One bug worth 1.0h attributed to exactly one side; reconciles to total.
+        self.assertEqual(sum(side_hours.values()), 1.0)
+        self.assertEqual(result[0]["totalBugHours"], 1.0)
 
 
 if __name__ == "__main__":

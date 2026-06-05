@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from schedule_delta import compute_schedule_delta, delta_has_changes  # noqa: E402
+from sprintkit.delta import compute_schedule_delta, delta_has_changes  # noqa: E402
 
 
 class TestScheduleDelta(unittest.TestCase):

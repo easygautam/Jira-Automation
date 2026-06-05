@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""Compare two schedule.json snapshots for recalculate / Schedule Delta report."""
+"""Compare two schedule snapshots for the recalculate / Schedule Delta report."""
 
 from __future__ import annotations
 
@@ -96,28 +95,3 @@ def compute_schedule_delta(
 
 def delta_has_changes(delta: dict[str, list[dict[str, Any]]]) -> bool:
     return any(delta.get(k) for k in delta)
-
-
-def main() -> None:
-    import argparse
-    import json
-    from pathlib import Path
-
-    parser = argparse.ArgumentParser(description="Diff two schedule JSON files")
-    parser.add_argument("--prior", required=True)
-    parser.add_argument("--current", required=True)
-    parser.add_argument("--output", default=None)
-    args = parser.parse_args()
-
-    prior = json.loads(Path(args.prior).read_text(encoding="utf-8"))
-    current = json.loads(Path(args.current).read_text(encoding="utf-8"))
-    result = compute_schedule_delta(prior, current)
-    out = json.dumps(result, indent=2)
-    if args.output:
-        Path(args.output).write_text(out + "\n", encoding="utf-8")
-    else:
-        print(out)
-
-
-if __name__ == "__main__":
-    main()

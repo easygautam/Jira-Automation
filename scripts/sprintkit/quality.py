@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
-"""Collect sprint data-quality flags grouped by assignee."""
+"""Data-quality flags grouped by assignee (estimates, worklog, mapping gaps)."""
 
 from __future__ import annotations
 
 from collections import defaultdict
 from typing import Any
 
-from jira_normalize import (
+from sprintkit.config import SCHEDULABLE_TYPES
+from sprintkit.jira_model import (
     assignee_id,
     bug_missing_logged_time,
     build_index,
@@ -15,7 +15,6 @@ from jira_normalize import (
     is_bug_issue,
     issue_type_name,
     resolve_epic,
-    SCHEDULABLE_TYPES,
 )
 
 REASON_MISSING_ESTIMATE = "Missing estimates"
@@ -182,60 +181,3 @@ def build_data_quality_by_member(
     return dict(
         sorted(consolidated.items(), key=lambda x: (x[0] == "Unassigned", x[0].lower()))
     )
-
-
-def main() -> None:
-    import argparse
-    import json
-    from pathlib import Path
-
-    parser = argparse.ArgumentParser(description="Build data-quality JSON by member")
-    parser.add_argument("--issues", required=True)
-    parser.add_argument("--schedule", required=True)
-    parser.add_argument("--engine-input", default=None, help="Deprecated; ignored")
-    parser.add_argument("--timeline-breakdown", default=None)
-    parser.add_argument("--config", default=".cursor/config/em-config.yaml")
-    parser.add_argument("--output", default=None)
-    args = parser.parse_args()
-
-    def load(path: str) -> Any:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
-        if isinstance(payload, dict) and "issues" in payload:
-            return payload["issues"]
-        return payload
-
-    issues = load(args.issues)
-    schedule = json.loads(Path(args.schedule).read_text(encoding="utf-8"))
-    timeline = None
-    if args.timeline_breakdown and Path(args.timeline_breakdown).exists():
-        timeline = json.loads(Path(args.timeline_breakdown).read_text(encoding="utf-8"))
-
-    assignee_names: dict[str, str] = {}
-    for i in issues:
-        a = get_field(i, "assignee")
-        if a:
-            aid = a.get("accountId") or a.get("displayName")
-            assignee_names[aid] = a.get("displayName", aid)
-
-    config: dict[str, Any] | None = None
-    config_path = Path(args.config)
-    if config_path.exists():
-        try:
-            import yaml
-
-            config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-        except ImportError:
-            pass
-
-    result = build_data_quality_by_member(
-        issues, schedule, timeline, assignee_names, config
-    )
-    out = json.dumps(result, indent=2)
-    if args.output:
-        Path(args.output).write_text(out + "\n", encoding="utf-8")
-    else:
-        print(out)
-
-
-if __name__ == "__main__":
-    main()

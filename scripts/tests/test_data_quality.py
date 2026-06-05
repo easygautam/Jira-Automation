@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from data_quality import (  # noqa: E402
+from sprintkit.quality import (  # noqa: E402
     REASON_EPIC_NOT_MAPPED,
     REASON_MISSING_ESTIMATE,
     REASON_MISSING_LOGGED_TIME,

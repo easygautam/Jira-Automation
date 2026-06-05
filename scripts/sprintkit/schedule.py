@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
-"""Deterministic sprint schedule calculator for EM workflow."""
+"""Deterministic per-assignee sprint scheduler (8h/day, business days)."""
 
 from __future__ import annotations
 
-import json
 import math
-import sys
 from datetime import date, timedelta
 from typing import Any
 
@@ -63,29 +60,13 @@ def classify_status(
         return "blocked"
     if not has_estimate:
         return "at_risk"
-    risk_threshold = sprint_end
-    days_to_end = 0
-    d = today
-    while d < sprint_end:
-        d = next_working_day(d, {0, 1, 2, 3, 4}) if d >= today else d + timedelta(days=1)
-        days_to_end += 1
-        if days_to_end > 2:
-            break
     if due > sprint_end:
         return "delayed"
-    if due <= sprint_end:
-        # at_risk if due within ~2 business days of sprint end from today
-        bd_count = 0
-        cursor = today
-        while cursor <= sprint_end and bd_count < 3:
-            if cursor.weekday() in {0, 1, 2, 3, 4}:
-                bd_count += 1
-            cursor += timedelta(days=1)
-        if due >= sprint_end - timedelta(days=2):
-            return "at_risk"
-        if today > due:
-            return "delayed"
-        return "on_track"
+    # due <= sprint_end: at_risk within ~2 days of sprint end, else by overdue/on_track
+    if due >= sprint_end - timedelta(days=2):
+        return "at_risk"
+    if today > due:
+        return "delayed"
     return "on_track"
 
 
@@ -160,18 +141,3 @@ def compute_schedule(data: dict[str, Any]) -> dict[str, Any]:
         "violations": violations,
         "unscheduled": unscheduled,
     }
-
-
-def main() -> None:
-    if len(sys.argv) < 2:
-        data = json.load(sys.stdin)
-    else:
-        with open(sys.argv[1], encoding="utf-8") as f:
-            data = json.load(f)
-    result = compute_schedule(data)
-    json.dump(result, sys.stdout, indent=2)
-    sys.stdout.write("\n")
-
-
-if __name__ == "__main__":
-    main()

@@ -1,20 +1,10 @@
-#!/usr/bin/env python3
-"""Team detection from Jira issue fields (shared by normalize, timeline, bug reports)."""
+"""Step 2 — team detection from Jira issue summary prefix, labels, components."""
 
 from __future__ import annotations
 
 from typing import Any
 
-# Stage names that must not match generic dev keyword rules when first prefix is QA
-_DEV_STAGE_NAMES = frozenset(
-    {
-        "Development",
-        "Assessment",
-        "BE development",
-        "Web development",
-        "Mobile development",
-    }
-)
+from sprintkit.jira_model import get_field
 
 TEAM_OTHER = "other"
 
@@ -27,8 +17,9 @@ _DEFAULT_PREFIX_MAPPING: dict[str, list[str]] = {
 }
 
 
-def get_field(issue: dict[str, Any], name: str) -> Any:
-    return (issue.get("fields") or {}).get(name)
+def _casefold(text: str) -> str:
+    """Case-insensitive normalize for prefix/alias comparison (BE, be, Be equivalent)."""
+    return text.casefold().strip()
 
 
 def load_prefix_alias_sets(config: dict[str, Any] | None = None) -> dict[str, frozenset[str]]:
@@ -42,11 +33,6 @@ def load_prefix_alias_sets(config: dict[str, Any] | None = None) -> dict[str, fr
             aliases = default_aliases
         result[team] = frozenset(_casefold(a) for a in aliases)
     return result
-
-
-def _casefold(text: str) -> str:
-    """Case-insensitive normalize for prefix/alias comparison (BE, be, Be equivalent)."""
-    return text.casefold().strip()
 
 
 def first_summary_prefix(summary: str) -> str | None:
@@ -123,67 +109,6 @@ def team_from_summary_start(
     return None
 
 
-def _summary_has_assessment_segment(summary: str) -> bool:
-    """True when a pipe segment is Assessment (e.g. BE | Assessment)."""
-    if "|" not in summary:
-        return False
-    parts = [p.strip().casefold() for p in summary.split("|")]
-    return any(p == "assessment" or p.endswith(" assessment") for p in parts[1:]) or (
-        parts[-1] == "assessment"
-    )
-
-
-def assessment_target(
-    summary: str,
-    config: dict[str, Any] | None = None,
-) -> str | None:
-    """
-    Platform key for Assessment stage, or qa_cross for QA | Assessment.
-    None if title is not an assessment task.
-    """
-    if not _summary_has_assessment_segment(summary):
-        return None
-    alias_sets = load_prefix_alias_sets(config)
-    team = team_from_first_prefix(summary, alias_sets)
-    if team == "qa":
-        return "qa_cross"
-    if team in ("backend", "frontend", "mobile"):
-        return team
-    return None
-
-
-def qa_platform_stream(summary: str) -> str | None:
-    """
-    When first prefix is QA, return backend | frontend | mobile for scoped QA work.
-    None when QA title has no Web/Mobile/BE stream (cross-platform test planning).
-    """
-    parts = [p.strip().lower() for p in summary.split("|")]
-    if not parts or parts[0] != "qa":
-        return None
-    if len(parts) < 2:
-        return None
-    context = " ".join(parts[1:])
-    if any(x in context for x in ("be", "backend", "api contract")):
-        return "backend"
-    if any(x in context for x in ("app", "mobile", "android", "ios")):
-        return "mobile"
-    if any(x in context for x in ("web", "website", "mweb", "frontend", "fe", "admin")):
-        return "frontend"
-    return None
-
-
-def qa_work_stream(summary: str) -> str:
-    """Legacy web/mobile stream; prefer qa_platform_stream for new code."""
-    stream = qa_platform_stream(summary)
-    if stream == "backend":
-        return "web"
-    if stream == "mobile":
-        return "mobile"
-    if stream == "frontend":
-        return "web"
-    return "web"
-
-
 def team_from_issue(
     issue: dict[str, Any],
     teams_cfg: dict[str, list[str]],
@@ -214,52 +139,3 @@ def team_from_issue(
             if kw.lower() in lower:
                 return team
     return TEAM_OTHER
-
-
-def task_from_pipe_prefix_team(
-    summary: str,
-    team: str,
-    timeline_cfg: dict[str, Any],
-    issuetype: str,
-    config: dict[str, Any] | None = None,
-) -> str | None:
-    """
-    When summary uses a recognized first pipe prefix, map Task/Sub-task to default
-    canonical row for that team (e.g. BE | Enhancement -> BE development).
-    """
-    if "|" not in summary:
-        return None
-    alias_sets = load_prefix_alias_sets(config)
-    if team_from_first_prefix(summary, alias_sets) is None:
-        return None
-    if team in (TEAM_OTHER, "qa"):
-        return None
-    itype = (issuetype or "").lower()
-    if itype not in ("task", "sub-task", "subtask"):
-        return None
-    if "assessment" in summary.lower():
-        return None
-    defaults = timeline_cfg.get("defaultTaskByTeam") or {}
-    return defaults.get(team)
-
-
-def stage_mapping_rule_applies(rule: dict[str, Any], summary: str) -> bool:
-    """Keyword match with optional excludeKeywords."""
-    keywords = [k.lower() for k in rule.get("keywords") or []]
-    if not keywords:
-        return False
-    lower = summary.lower()
-    if not any(kw in lower for kw in keywords):
-        return False
-    for ex in rule.get("excludeKeywords") or []:
-        if ex.lower() in lower:
-            return False
-    return True
-
-
-def mapping_rule_applies(rule: dict[str, Any], summary: str, team: str) -> bool:
-    """Keyword match; skip dev-stage rules when title is QA-prefixed."""
-    stage = rule.get("stage") or rule.get("task")
-    if stage in _DEV_STAGE_NAMES and team == "qa":
-        return False
-    return stage_mapping_rule_applies(rule, summary)

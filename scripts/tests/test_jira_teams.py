@@ -9,8 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from jira_teams import TEAM_OTHER, team_from_first_prefix, team_from_issue  # noqa: E402
-from timeline_breakdown import classify_issue  # noqa: E402
+from sprintkit.stages import classify_issue  # noqa: E402
+from sprintkit.teams import TEAM_OTHER, team_from_first_prefix, team_from_issue  # noqa: E402
 
 
 def _issue(summary: str, issuetype: str = "Task") -> dict:

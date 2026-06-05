@@ -1,26 +1,20 @@
-#!/usr/bin/env python3
-"""Aggregate Bug issue effort per epic and member (totals only, no issue lists)."""
+"""Bug fix effort: worklog time-spent per epic, engineering side, and member."""
 
 from __future__ import annotations
 
-import argparse
-import json
-import sys
-from collections import defaultdict
-from pathlib import Path
 from typing import Any
 
-from jira_normalize import (
+from sprintkit.jira_model import (
+    assignee_name,
     epic_summary,
-    get_field,
     is_bug_issue,
     is_epic_issue,
     resolve_epic_key,
     sort_epic_keys,
     time_spent_seconds,
 )
-from jira_teams import team_from_issue
-from timeline_breakdown import assignee_name, load_config, side_display
+from sprintkit.teams import team_from_issue
+from sprintkit.timeline import side_display
 
 
 def collect_sprint_epic_keys(
@@ -61,26 +55,22 @@ def build_bug_effort_breakdown(
         ]
 
         member_rows: dict[str, dict[str, Any]] = {}
+        side_hours: dict[str, float] = {}
 
         for issue in epic_bugs:
             est_h = time_spent_seconds(issue, config) / 3600.0
             member = assignee_name(issue)
             team = team_from_issue(issue, teams_cfg, config)
             side = side_display(team, side_display_map)
+            side_hours[side] = side_hours.get(side, 0.0) + est_h
             if member not in member_rows:
-                member_rows[member] = {
-                    "member": member,
-                    "effortsHours": 0.0,
-                    "bugCount": 0,
-                    "sides": set(),
-                }
+                member_rows[member] = {"member": member, "effortsHours": 0.0, "bugCount": 0}
             row = member_rows[member]
             row["effortsHours"] += est_h
             row["bugCount"] += 1
-            row["sides"].add(side)
 
         members: list[dict[str, Any]] = []
-        by_side: dict[str, dict[str, Any]] = {}
+        side_hours_out: dict[str, float] = {}
         total = None
 
         if epic_bugs:
@@ -91,23 +81,8 @@ def build_bug_effort_breakdown(
             )
             for m in members:
                 m["effortsHours"] = round(m["effortsHours"], 1) if m["effortsHours"] else None
-                sides = m.pop("sides", set())
-                m["sides"] = sorted(sides)
-                m["side"] = ", ".join(m["sides"]) if sides else "Other"
-
-            by_side_acc: dict[str, dict[str, Any]] = defaultdict(
-                lambda: {"totalEffortHours": 0.0, "bugCount": 0, "members": []}
-            )
-            for m in members:
-                side = m["side"]
-                by_side_acc[side]["totalEffortHours"] += m.get("effortsHours") or 0
-                by_side_acc[side]["bugCount"] += m["bugCount"]
-                by_side_acc[side]["members"].append(m["member"])
-            for side, data in by_side_acc.items():
-                data["totalEffortHours"] = round(data["totalEffortHours"], 1) or None
-                data["memberCount"] = len(data["members"])
-            by_side = dict(by_side_acc)
-            total = round(sum(m.get("effortsHours") or 0 for m in members), 1) or None
+            side_hours_out = {s: round(h, 1) for s, h in side_hours.items() if round(h, 1)}
+            total = round(sum(side_hours.values()), 1) or None
 
         results.append(
             {
@@ -116,33 +91,8 @@ def build_bug_effort_breakdown(
                 "totalBugHours": total or None,
                 "bugCount": len(epic_bugs),
                 "members": members,
-                "bySide": dict(by_side),
+                "sideHours": side_hours_out,
             }
         )
 
     return results
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Build bug effort breakdown JSON")
-    parser.add_argument("--config", default=".cursor/config/em-config.yaml")
-    parser.add_argument("--issues", required=True)
-    parser.add_argument("--schedule", required=True)
-    parser.add_argument("--output", help="Write JSON path")
-    args = parser.parse_args()
-
-    config = load_config(Path(args.config))
-    payload = json.loads(Path(args.issues).read_text(encoding="utf-8"))
-    issues = payload if isinstance(payload, list) else payload.get("issues", payload)
-    schedule = json.loads(Path(args.schedule).read_text(encoding="utf-8"))
-
-    result = build_bug_effort_breakdown(issues, schedule, config)
-    out = json.dumps(result, indent=2)
-    if args.output:
-        Path(args.output).write_text(out + "\n", encoding="utf-8")
-    else:
-        sys.stdout.write(out + "\n")
-
-
-if __name__ == "__main__":
-    main()

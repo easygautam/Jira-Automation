@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from jira_normalize import (  # noqa: E402
+from sprintkit.jira_model import (  # noqa: E402
     epic_jira_sort_key,
     jira_rank,
     sort_epic_keys,

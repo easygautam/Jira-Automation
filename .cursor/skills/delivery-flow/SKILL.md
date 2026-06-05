@@ -44,7 +44,7 @@ All teams (Backend, Mobile, Web, QA) understand the requirement and do tech solu
 | Backend provides API contracts | QA writes automation |
 | Backend delivers APIs | QA validates API once backend delivers |
 
-Engine implementation (`scripts/schedule_engine.py`):
+Engine implementation (`scripts/sprintkit/schedule.py`):
 
 - Items with `team` = mobile or frontend: `start ≥` linked BE story/item due date for same epic
 - Items with `team` = qa and dependency type API validation: start ≥ BE due date for same epic
@@ -77,4 +77,4 @@ Per-epic **Execution stages** tables are **per platform** (`timeline.executionSt
 - `QA \| Web` / `QA \| Mobile` / `QA \| BE` → Stage testing or release stages on that platform (Pre-Prod, UAT, Ready for release are **separate** rows per Web/Mobile)
 - Pipe-prefix dev tasks → Development; buffers in `timeline.effortBuffers`
 
-**Team on tasks:** first `|` prefix via `scripts/jira_teams.py` (see `jira-domain`). Timeline effort counts **Task/Sub-task** only; **Bug** effort is a separate report section (worklog). Timeline does not bucket Bug issue types.
+**Team on tasks:** first `|` prefix via `scripts/sprintkit/teams.py` + stage mapping in `scripts/sprintkit/stages.py` (see `jira-domain`). Timeline effort counts **Task/Sub-task** only; **Bug** effort is a separate report section (worklog). Timeline does not bucket Bug issue types.

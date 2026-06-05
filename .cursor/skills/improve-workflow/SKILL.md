@@ -11,22 +11,22 @@ disable-model-invocation: true
 
 **Protocol:** PLAN → VALIDATE → EXECUTE → REPORT
 
-System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`em-orchestrator`** skill.
+System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`sprint-report`** skill.
 
 ## Cross-reference matrix
 
 | If you change… | Also update… |
 |----------------|--------------|
-| Schedule algorithm | `sprint-planning`, `schedule-engine.mdc`, `schedule_engine.py`, tests |
-| Issue hierarchy / effort | `jira-domain`, `jira_normalize.py`, `em-config.yaml` |
-| Team / summary prefixes | `jira_teams.py`, `jira-domain`, `timeline_breakdown.py`, `bug_effort_breakdown.py`, `jira_normalize.py`, `WORKFLOW.md`, tests |
-| Delivery phases / deps | `delivery-flow`, `schedule_engine.py`, `sprint-report` |
-| Report format | `sprint-report`, `em-orchestrator`, `render_report.py`, `schedule_delta.py` |
-| New command | command file + `em-workflow.mdc` + `WORKFLOW.md` + orchestrator skill |
-| Jira field mapping | `em-config.yaml`, `jira-domain`, `jira_normalize.py`, `sprint_meta.py` |
-| Sprint window / epic rollup | `sprint_meta.py`, `render_report.py`, `sprint-report` |
-| Timeline / bug sections | respective scripts, `render_report.py`, `sprint-report` |
-| MCP fetch protocol | `jira-domain`, `em-orchestrator`, `sprint-analyst` |
+| Schedule algorithm | `sprint-report` skill, `schedule-engine.mdc`, `sprintkit/schedule.py`, tests |
+| Issue hierarchy / effort | `jira-domain`, `sprintkit/normalize.py`, `sprintkit/jira_model.py`, `em-config.yaml` |
+| Team / summary prefixes | `sprintkit/teams.py`, `sprintkit/stages.py`, `jira-domain`, `delivery-flow`, `WORKFLOW.md`, tests |
+| Delivery phases / deps | `delivery-flow`, `sprintkit/schedule.py`, `sprintkit/stages.py`, `sprint-report` |
+| Report format | `sprint-report`, `sprintkit/render/*`, tests |
+| New option / command | `sprint-report.md` command + `em-workflow.mdc` + `WORKFLOW.md` + `sprint_report.py` |
+| Jira field mapping | `em-config.yaml`, `jira-domain`, `sprintkit/normalize.py`, `sprintkit/sprint_window.py` |
+| Sprint window / epic rollup | `sprintkit/sprint_window.py`, `sprintkit/render/sections.py`, `sprint-report` |
+| Timeline / bug sections | `sprintkit/timeline.py`, `sprintkit/bugs.py`, `sprintkit/render/sections.py`, `sprint-report` |
+| MCP fetch protocol | `jira-domain`, `sprint-report` skill, `sprint-analyst` agent |
 
 ## Workflow
 
@@ -45,9 +45,9 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`em-orchest
 ### Files to change
 | File | Change |
 ### Cross-reference checks
-- [ ] schedule-engine.mdc ↔ schedule_engine.py
+- [ ] schedule-engine.mdc ↔ sprintkit/schedule.py
 - [ ] WORKFLOW.md ↔ scripts and commands
-- [ ] jira-domain ↔ jira_teams.py / config
+- [ ] jira-domain ↔ sprintkit/teams.py + stages.py / config
 - [ ] Tests cover new behavior
 ```
 
@@ -61,6 +61,7 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`em-orchest
 
 ## Changelog
 
+- 2026-06-05 — **Workflow refactor:** 9 flat scripts → one `scripts/sprintkit/` package mirroring the 5-step process (`config`, `jira_model`, `teams`, `stages`, `sprint_window`, `normalize`, `schedule`, `delta`, `timeline`, `bugs`, `quality`, `pipeline`, `render/*`) behind a single `scripts/sprint_report.py`. Consolidated to one `/sprint-report` command + one `sprint-analyst` agent (retired `recalculate-schedule`/`daily-standup` commands, `em-orchestrator` agent + skill, `sprint-planning` skill; recalc/standup are now flags). Fixes: Bug fix effort reconciles `Backend/Web/Mobile/QA/Other/Total`; removed always-empty Start/End columns + dead date code; blank line before Unmapped sprint work; reconciled Teams-plan Tasks count. Added golden pipeline test; behaviour ported verbatim (report parity vs old scripts) before fixes.
 - 2026-06-05 — Report: all Jira issue keys render as browse links via `jira.siteUrl` (`resolve_jira_site_url`, timeline Issues column, bug Epic ID); sprint-report skill updated.
 - 2026-06-05 — Sprint window rule (all statuses, sprint start→end); Teams plan team summary uses a single combined `Leave (h)` (planned+unplanned) while the member breakdown keeps detailed Planned leave + Unplanned delay; execution-stage `Delay (h)` column removed (folded into combined `Leave (h)`); execution stages omit platforms with no Jira tasks (`hasWork`); all timeline `Start`/`End` render as `—` and epic/platform delivery-window + go-live + calendar-day lines removed — **calendar dates deferred** (sprint-window date rule to be implemented later).
 - 2026-06-03 — Execution stages: per-platform pipelines (Backend/Web/Mobile), QA cross-platform Test planning, prefix `| Assessment` mapping, `QA | Web/Mobile/BE` streams, synthetic Bug fixes / Stage final testing buffers, separate Pre-Prod/UAT/Ready for release and Prod release/Prod final testing; report section renamed from Task breakdown.

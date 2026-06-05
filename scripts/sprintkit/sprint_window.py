@@ -1,25 +1,8 @@
-#!/usr/bin/env python3
-"""Extract active sprint window from Jira issue sprint field."""
+"""Step 1 — extract the active sprint window from the Jira sprint field."""
 
 from __future__ import annotations
 
-import argparse
-import json
-import sys
-from pathlib import Path
 from typing import Any
-
-try:
-    import yaml
-except ImportError:
-    yaml = None  # type: ignore
-
-
-def load_config(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8")
-    if yaml is not None:
-        return yaml.safe_load(text) or {}
-    return {}
 
 
 def parse_date(value: str | None) -> str | None:
@@ -79,35 +62,3 @@ def extract_active_sprint(
         "sprintEnd": end,
         "state": chosen.get("state", "active"),
     }
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Extract active sprint metadata from Jira issues")
-    parser.add_argument("--config", default=".cursor/config/em-config.yaml")
-    parser.add_argument("--input", required=True)
-    parser.add_argument("--output", help="Write JSON; default stdout")
-    parser.add_argument("--sprint-field", help="Override config fields.sprint")
-    args = parser.parse_args()
-
-    config = load_config(Path(args.config))
-    fields_cfg = config.get("fields") or {}
-    sprint_field = args.sprint_field or fields_cfg.get("sprint") or "customfield_10020"
-
-    payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
-    issues = payload if isinstance(payload, list) else payload.get("issues", payload)
-
-    try:
-        meta = extract_active_sprint(issues, sprint_field)
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        sys.exit(1)
-
-    out = json.dumps(meta, indent=2)
-    if args.output:
-        Path(args.output).write_text(out + "\n", encoding="utf-8")
-    else:
-        sys.stdout.write(out + "\n")
-
-
-if __name__ == "__main__":
-    main()

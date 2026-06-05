@@ -5,17 +5,28 @@ alwaysApply: true
 
 # EM Workflow
 
-When the user runs sprint commands or asks about sprint health, scheduling, standup, or delivery status:
+When the user runs `/sprint-report` or asks about sprint health, scheduling, standup, or delivery status:
 
 1. Load `.cursor/config/em-config.yaml` before any Jira fetch
 2. Resolve `cloudId` via Atlassian MCP `getAccessibleAtlassianResources` if empty
-3. Follow the matching skill:
+3. Drive everything through **one agent + one command**:
+   - Agent: `.cursor/agents/sprint-analyst.md`
    - `/sprint-report` → `.cursor/skills/sprint-report/SKILL.md`
-   - `/recalculate-schedule` → `.cursor/skills/sprint-planning/SKILL.md` + sprint-report
-   - `/daily-standup` → `.cursor/skills/sprint-report/SKILL.md` (standup mode)
+   - Recalculate (priority/scope change): `/sprint-report` with `--recalc` (adds a Schedule Delta)
+   - Daily standup (chat only): `/sprint-report` with `--standup`
    - `/improve-workflow` → `.cursor/skills/improve-workflow/SKILL.md`
-4. Save reports to `reports/sprint-{YYYY-MM-DD}.md` (single file; timeline + bug inline)
-5. Pipeline and file inventory: `.cursor/WORKFLOW.md` — runbook: `em-orchestrator` skill
+4. One command runs the whole pipeline and saves `reports/sprint-{YYYY-MM-DD}.md`:
+
+   ```bash
+   python scripts/sprint_report.py --issues scripts/.tmp/issues.json \
+     --config .cursor/config/em-config.yaml --project {projectKey}
+   ```
+
+5. Pipeline and file inventory: `.cursor/WORKFLOW.md`
+
+## Five-step process
+
+1. Load sprint items → 2. Map task → platform/team → 3. Map leave → team leaves → 4. Map task → stage → 5. Calculate team effort per stage
 
 ## Trigger phrases
 
@@ -23,8 +34,3 @@ When the user runs sprint commands or asks about sprint health, scheduling, stan
 - recalculate schedule, priority change, re-prioritize
 - daily standup, scrum, blockers, talking points
 - improve workflow, update EM automation
-
-## Orchestration
-
-Primary agent: `.cursor/agents/em-orchestrator.md`  
-Protocol: PLAN → FETCH → NORMALIZE → CALCULATE → TIMELINE_BREAKDOWN → BUG_EFFORT → REPORT → SAVE
