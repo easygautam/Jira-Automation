@@ -13,7 +13,11 @@ from typing import Any
 from sprintkit.bugs import build_bug_effort_breakdown
 from sprintkit.normalize import normalize
 from sprintkit.quality import build_data_quality_by_member, count_dq_reasons
-from sprintkit.render.markdown import jira_issue_link, resolve_jira_site_url
+from sprintkit.render.markdown import (
+    jira_issue_link,
+    linkify_bare_issue_keys,
+    resolve_jira_site_url,
+)
 from sprintkit.render.report import render_report
 from sprintkit.schedule import compute_schedule
 from sprintkit.sprint_window import extract_active_sprint
@@ -135,7 +139,7 @@ def standup_summary(
 ) -> str:
     """Short chat-oriented standup text: blockers, overdue, at-risk, DQ counts."""
     issue_by_key = {i["key"]: i for i in issues}
-    site = resolve_jira_site_url(jira_site_url, config)
+    site = resolve_jira_site_url(jira_site_url, config, issues)
     today = result.engine.get("today", date.today().isoformat())
     sprint_end = result.sprint_meta.get("sprintEnd", "")
 
@@ -190,4 +194,6 @@ def standup_summary(
         top = ", ".join(f"{r} {n}" for r, n in sorted(reasons.items()))
         lines.append(f"Data quality: {flagged} flagged tickets ({top}).")
 
-    return "\n".join(lines).rstrip() + "\n"
+    text = "\n".join(lines).rstrip() + "\n"
+    project_key = (config or {}).get("jira", {}).get("projectKey")
+    return linkify_bare_issue_keys(text, site, project_key=project_key)

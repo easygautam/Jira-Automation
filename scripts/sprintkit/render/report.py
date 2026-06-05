@@ -9,7 +9,7 @@ from typing import Any
 from sprintkit.delta import compute_schedule_delta
 from sprintkit.jira_model import epic_jira_sort_key, is_epic_issue
 from sprintkit.quality import build_data_quality_by_member
-from sprintkit.render.markdown import resolve_jira_site_url
+from sprintkit.render.markdown import linkify_bare_issue_keys, resolve_jira_site_url
 from sprintkit.render.sections import (
     render_bug_sections,
     render_data_quality_section,
@@ -35,7 +35,7 @@ def render_report(
     config: dict[str, Any] | None = None,
     prior_schedule: dict[str, Any] | None = None,
 ) -> str:
-    jira_site_url = resolve_jira_site_url(jira_site_url, config)
+    jira_site_url = resolve_jira_site_url(jira_site_url, config, issues)
 
     issue_by_key = {i["key"]: i for i in issues}
     est_by_key = {x["key"]: x.get("estimateSeconds", 0) for x in engine.get("items", [])}
@@ -134,4 +134,6 @@ def render_report(
 
     lines.extend(render_recommended_actions(quality_by_member))
 
-    return "\n".join(lines)
+    report = "\n".join(lines)
+    project_key = (config or {}).get("jira", {}).get("projectKey") or project
+    return linkify_bare_issue_keys(report, jira_site_url, project_key=project_key)

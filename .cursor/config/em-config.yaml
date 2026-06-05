@@ -99,6 +99,7 @@ timeline:
     backend: Backend
     frontend: Web
     mobile: Mobile
+    product_design: "Product + Design"
     qa: QA
     other: Other
     unknown: Other
@@ -130,7 +131,6 @@ timeline:
       - Stage final testing
       - Pre-Prod testing
       - UAT
-      - Ready for release
       - Go live date
     mobile:
       - Tech Solutioning
@@ -141,23 +141,9 @@ timeline:
       - Stage final testing
       - Pre-Prod testing
       - UAT
-      - Ready for release
       - Go live date
   leaveMappingRules:
     - { keywords: ["leave | planned"], leaveType: planned }
     - { keywords: ["leave | unplanned"], leaveType: unplanned }
-  stageMapping:
-    - { platform: backend, stage: Prod final testing, keywords: ["prod final", "production final", "uat prod"] }
-    - { platform: backend, stage: Prod release, keywords: ["prod release", "production release"], excludeKeywords: ["prod final", "final testing"] }
-    - { platform: backend, stage: Go live date, keywords: ["go live"] }
-    - { platform: frontend, stage: Ready for release, keywords: ["ready for release"] }
-    - { platform: frontend, stage: UAT, keywords: ["uat stage", "uat final", " uat "], excludeKeywords: ["pre-prod", "pre prod"] }
-    - { platform: frontend, stage: Pre-Prod testing, keywords: ["pre-prod", "pre prod", "qa web pre-prod", "web pre-prod"] }
-    - { platform: mobile, stage: Ready for release, keywords: ["ready for release"] }
-    - { platform: mobile, stage: UAT, keywords: ["uat stage", "uat final", " uat "] }
-    - { platform: mobile, stage: Pre-Prod testing, keywords: ["pre-prod", "pre prod", "qa mobile pre-prod", "mobile pre-prod"] }
-    - { platform: frontend, stage: Go live date, keywords: ["go live"] }
-    - { platform: mobile, stage: Go live date, keywords: ["go live"] }
-    - { platform: backend, stage: Development, keywords: ["be development", "backend dev", "dag flow", "enhancement"] }
-    - { platform: frontend, stage: Development, keywords: ["frontend dev", "web dev"] }
-    - { platform: mobile, stage: Development, keywords: ["mobile dev", "android dev", "ios dev"] }
+  # Stage mapping is pipe-segment based in scripts/sprintkit/stages.py (not keyword rules).
+  stageMapping: []

@@ -5,6 +5,8 @@
 * ``{"kind": "leave", "leaveType": ..., "team": ..., "comment": ...}``
 * ``{"kind": "work", "platform": ..., "stage": ..., "team": ..., "issueKey": ...}``
 * ``{"kind": "unmapped", "platform": None, "stage": None, "team": ...}``
+
+Stage mapping uses pipe-segment positions only (no keyword substring search).
 """
 
 from __future__ import annotations
@@ -30,6 +32,8 @@ from sprintkit.teams import (
 PLATFORM_KEYS = ("backend", "frontend", "mobile")
 PLATFORM_SIDE = {"backend": "Backend", "frontend": "Web", "mobile": "Mobile"}
 
+TEAM_PRODUCT_DESIGN = "product_design"
+
 STAGE_TECH_SOLUTIONING = "Tech Solutioning"
 STAGE_QA_TEST_PLANNING = "QA Test Planning"
 STAGE_DEVELOPMENT = "Development"
@@ -40,7 +44,6 @@ STAGE_PROD_RELEASE = "Prod release"
 STAGE_PROD_FINAL_TESTING = "Prod final testing"
 STAGE_PREPROD = "Pre-Prod testing"
 STAGE_UAT = "UAT"
-STAGE_READY = "Ready for release"
 STAGE_GO_LIVE = "Go live date"
 
 DEFAULT_EXECUTION_STAGES: dict[str, list[str]] = {
@@ -64,7 +67,6 @@ DEFAULT_EXECUTION_STAGES: dict[str, list[str]] = {
         STAGE_STAGE_FINAL_TESTING,
         STAGE_PREPROD,
         STAGE_UAT,
-        STAGE_READY,
         STAGE_GO_LIVE,
     ],
     "mobile": [
@@ -76,7 +78,6 @@ DEFAULT_EXECUTION_STAGES: dict[str, list[str]] = {
         STAGE_STAGE_FINAL_TESTING,
         STAGE_PREPROD,
         STAGE_UAT,
-        STAGE_READY,
         STAGE_GO_LIVE,
     ],
 }
@@ -88,8 +89,21 @@ _DEFAULT_TASK_BY_TEAM: dict[str, str] = {
     "mobile": "Development",
 }
 
+_WEB_MOBILE_PREPROD_SEG3 = frozenset(
+    {"pre-prod", "pre prod", "pre-prod testing", "final testing", "prod testing"}
+)
+
+_BACKEND_PROD_RELEASE_SEG = frozenset({"prod release", "production release"})
+_BACKEND_PROD_FINAL_SEG = frozenset(
+    {"prod final testing", "prod final", "production final testing", "production final"}
+)
+
 
 # --- prefix/stage helpers -------------------------------------------------
+
+
+def _pipe_segments(summary: str) -> list[str]:
+    return [p.strip() for p in summary.split("|")]
 
 
 def _summary_has_assessment_segment(summary: str) -> bool:
@@ -114,6 +128,20 @@ def platform_from_pipe_segment(
     return None
 
 
+def platform_uat_from_segments(
+    summary: str,
+    config: dict[str, Any] | None = None,
+) -> str | None:
+    """{WEB|APP|BE} | UAT | … → platform key when segment 2 is UAT."""
+    parts = _pipe_segments(summary)
+    if len(parts) < 2:
+        return None
+    platform = platform_from_pipe_segment(parts[0], config)
+    if platform and parts[1].casefold() == "uat":
+        return platform
+    return None
+
+
 def qa_platform_from_segment(
     summary: str,
     config: dict[str, Any] | None = None,
@@ -122,12 +150,63 @@ def qa_platform_from_segment(
     Platform for QA work from the second pipe segment only (QA | App | …).
     None when segment 2 is missing or not App/Web/BE.
     """
-    parts = [p.strip() for p in summary.split("|")]
+    parts = _pipe_segments(summary)
     if not parts or parts[0].casefold() != "qa":
         return None
     if len(parts) < 2:
         return None
     return platform_from_pipe_segment(parts[1], config)
+
+
+def qa_stage_from_segments(
+    summary: str,
+    config: dict[str, Any] | None = None,
+) -> tuple[str, str] | None:
+    """
+    QA | {Platform} | {stage segment} | … → (platform, stage) from segment 3 only.
+    Web/Mobile pre-prod aliases → Pre-Prod testing.
+    Backend final testing → Prod final testing.
+    """
+    parts = _pipe_segments(summary)
+    if len(parts) < 3 or parts[0].casefold() != "qa":
+        return None
+    platform = platform_from_pipe_segment(parts[1], config)
+    if not platform:
+        return None
+    seg3 = parts[2].casefold()
+    if platform in ("frontend", "mobile") and seg3 in _WEB_MOBILE_PREPROD_SEG3:
+        return platform, STAGE_PREPROD
+    if platform == "backend":
+        if seg3 == "final testing":
+            return platform, STAGE_PROD_FINAL_TESTING
+        if seg3 in _BACKEND_PROD_RELEASE_SEG:
+            return platform, STAGE_PROD_RELEASE
+        if seg3 in _BACKEND_PROD_FINAL_SEG:
+            return platform, STAGE_PROD_FINAL_TESTING
+    return None
+
+
+def platform_release_from_segments(
+    summary: str,
+    config: dict[str, Any] | None = None,
+) -> tuple[str, str] | None:
+    """
+    {Platform} | {release segment} | … from segment 2 (non-QA platform-prefixed tasks).
+    """
+    parts = _pipe_segments(summary)
+    if len(parts) < 2:
+        return None
+    platform = platform_from_pipe_segment(parts[0], config)
+    if not platform:
+        return None
+    seg2 = parts[1].casefold()
+    if seg2 in _BACKEND_PROD_RELEASE_SEG:
+        return platform, STAGE_PROD_RELEASE
+    if seg2 in _BACKEND_PROD_FINAL_SEG:
+        return platform, STAGE_PROD_FINAL_TESTING
+    if seg2 == "go live":
+        return platform, STAGE_GO_LIVE
+    return None
 
 
 def assessment_target(
@@ -170,42 +249,15 @@ def task_from_pipe_prefix_team(
     itype = (issuetype or "").lower()
     if itype not in ("task", "sub-task", "subtask"):
         return None
-    if "assessment" in summary.lower():
+    if _summary_has_assessment_segment(summary):
         return None
     defaults = timeline_cfg.get("defaultTaskByTeam") or _DEFAULT_TASK_BY_TEAM
     return defaults.get(team)
 
 
-def stage_mapping_rule_applies(rule: dict[str, Any], summary: str) -> bool:
-    """Keyword match with optional excludeKeywords."""
-    keywords = [k.lower() for k in rule.get("keywords") or []]
-    if not keywords:
-        return False
-    lower = summary.lower()
-    if not any(kw in lower for kw in keywords):
-        return False
-    for ex in rule.get("excludeKeywords") or []:
-        if ex.lower() in lower:
-            return False
-    return True
-
-
-def _match_config_stage(
-    stage_mapping: list[dict[str, Any]],
-    platform: str,
-    summary: str,
-) -> str | None:
-    for rule in stage_mapping:
-        if rule.get("platform") != platform:
-            continue
-        if stage_mapping_rule_applies(rule, summary):
-            return rule.get("stage")
-    return None
-
-
 def _is_qa_test_planning(summary: str) -> bool:
     """True when segments after platform contain assessment or test planning."""
-    parts = [p.strip() for p in summary.split("|")]
+    parts = _pipe_segments(summary)
     if len(parts) < 3:
         return False
     remainder = " ".join(parts[2:]).casefold()
@@ -214,32 +266,8 @@ def _is_qa_test_planning(summary: str) -> bool:
 
 def _is_qa_automation(summary: str) -> bool:
     """True when third segment is Automation (QA | Platform | Automation | …)."""
-    parts = [p.strip() for p in summary.split("|")]
+    parts = _pipe_segments(summary)
     return len(parts) >= 3 and parts[2].casefold() == "automation"
-
-
-def _qa_scoped_release_stage(summary: str, platform: str) -> str | None:
-    lower = summary.lower()
-    if "ready for release" in lower:
-        return STAGE_READY
-    if ("uat" in lower or "uat stage" in lower) and "pre-prod" not in lower and "pre prod" not in lower:
-        if "prod final" in lower or "uat prod" in lower:
-            return None
-        return STAGE_UAT
-    if "pre-prod" in lower or "pre prod" in lower:
-        return STAGE_PREPROD
-    return None
-
-
-def _backend_prod_stage(summary: str) -> str | None:
-    lower = summary.lower()
-    if any(k in lower for k in ("prod final", "production final", "uat prod")):
-        return STAGE_PROD_FINAL_TESTING
-    if any(k in lower for k in ("prod release", "production release")):
-        if "prod final" in lower or "final testing" in lower:
-            return None
-        return STAGE_PROD_RELEASE
-    return None
 
 
 def resolve_leave_team(
@@ -281,7 +309,6 @@ def classify_issue(
     planned_p = (prefixes.get("planned") or "Leave | Planned").lower()
     unplanned_p = (prefixes.get("unplanned") or "Leave | Unplanned").lower()
     generic_p = (prefixes.get("generic") or "Leave |").lower()
-    stage_mapping = timeline_cfg.get("stageMapping") or []
 
     def _work(platform: str, stage: str, team: str) -> dict[str, Any]:
         return {
@@ -315,6 +342,10 @@ def classify_issue(
     if assess_platform in PLATFORM_KEYS:
         return _work(assess_platform, STAGE_TECH_SOLUTIONING, assess_platform)
 
+    uat_platform = platform_uat_from_segments(summary, config)
+    if uat_platform:
+        return _work(uat_platform, STAGE_UAT, TEAM_PRODUCT_DESIGN)
+
     team = team_from_issue(issue, teams_cfg, config)
     itype = issue_type_name(issue)
 
@@ -329,37 +360,18 @@ def classify_issue(
         if _is_qa_automation(summary):
             return _work(qa_platform, STAGE_STAGE_TESTING, "qa")
 
-        release_stage = _qa_scoped_release_stage(summary, qa_platform)
-        if release_stage and qa_platform in ("frontend", "mobile"):
-            return _work(qa_platform, release_stage, "qa")
-        if qa_platform == "backend":
-            prod = _backend_prod_stage(summary)
-            if prod:
-                return _work("backend", prod, "qa")
-
-        mapped = _match_config_stage(stage_mapping, qa_platform, summary)
-        if mapped:
-            return _work(qa_platform, mapped, "qa")
+        qa_stage = qa_stage_from_segments(summary, config)
+        if qa_stage:
+            plat, stage = qa_stage
+            return _work(plat, stage, "qa")
 
         return _work(qa_platform, STAGE_STAGE_TESTING, "qa")
 
-    if team == "backend":
-        prod = _backend_prod_stage(summary)
-        if prod:
-            return _work("backend", prod, team)
-        if "go live" in lower:
-            return _work("backend", STAGE_GO_LIVE, "backend")
-
-    if team in PLATFORM_KEYS:
-        mapped = _match_config_stage(stage_mapping, team, summary)
-        if mapped:
-            return _work(team, mapped, team)
-        if team in ("frontend", "mobile"):
-            release_stage = _qa_scoped_release_stage(summary, team)
-            if release_stage:
-                return _work(team, release_stage, team)
-        if "go live" in lower:
-            return _work(team, STAGE_GO_LIVE, team)
+    release = platform_release_from_segments(summary, config)
+    if release and team in PLATFORM_KEYS:
+        plat, stage = release
+        if plat == team:
+            return _work(plat, stage, team)
 
     if itype == "bug":
         return {"kind": "unmapped", "platform": None, "stage": None, "team": team}

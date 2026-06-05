@@ -11,9 +11,12 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from sprintkit.stages import (  # noqa: E402
     STAGE_DEVELOPMENT,
+    STAGE_PROD_FINAL_TESTING,
     STAGE_QA_TEST_PLANNING,
     STAGE_STAGE_TESTING,
     STAGE_TECH_SOLUTIONING,
+    STAGE_UAT,
+    TEAM_PRODUCT_DESIGN,
     classify_issue,
 )
 from sprintkit.timeline import build_timeline_breakdown, calc_days  # noqa: E402
@@ -82,6 +85,7 @@ MINIMAL_CONFIG = {
             "backend": "Backend",
             "frontend": "Web",
             "mobile": "Mobile",
+            "product_design": "Product + Design",
             "qa": "QA",
             "unknown": "Other",
         },
@@ -111,7 +115,6 @@ MINIMAL_CONFIG = {
                 "Stage final testing",
                 "Pre-Prod testing",
                 "UAT",
-                "Ready for release",
                 "Go live date",
             ],
             "mobile": [
@@ -123,7 +126,6 @@ MINIMAL_CONFIG = {
                 "Stage final testing",
                 "Pre-Prod testing",
                 "UAT",
-                "Ready for release",
                 "Go live date",
             ],
         },
@@ -214,6 +216,42 @@ class TestClassifyIssue(unittest.TestCase):
         self.assertEqual(result["platform"], "frontend")
         self.assertEqual(result["stage"], STAGE_STAGE_TESTING)
 
+    def test_designer_uat_in_title_is_development(self):
+        issue = _issue("VP-19936", "Web | UI Pointers Webview - Designer UAT", 21600)
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
+        self.assertEqual(result["kind"], "work")
+        self.assertEqual(result["platform"], "frontend")
+        self.assertEqual(result["stage"], STAGE_DEVELOPMENT)
+
+    def test_web_uat_segment_maps_product_design(self):
+        issue = _issue("VP-5", "WEB | UAT | sign-off with product", 3600)
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
+        self.assertEqual(result["platform"], "frontend")
+        self.assertEqual(result["stage"], STAGE_UAT)
+        self.assertEqual(result["team"], TEAM_PRODUCT_DESIGN)
+
+    def test_qa_web_uat_suffix_is_stage_testing(self):
+        issue = _issue("VP-6", "QA | WEB | UAT sign-off", 3600)
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
+        self.assertEqual(result["platform"], "frontend")
+        self.assertEqual(result["stage"], STAGE_STAGE_TESTING)
+        self.assertEqual(result["team"], "qa")
+
+    def test_qa_be_final_testing_is_prod_final(self):
+        issue = _issue("VP-7", "QA | BE | Final Testing | API validation", 7200)
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
+        self.assertEqual(result["platform"], "backend")
+        self.assertEqual(result["stage"], STAGE_PROD_FINAL_TESTING)
+        self.assertEqual(result["team"], "qa")
+
 
 class TestBuildTimelineBreakdown(unittest.TestCase):
     def test_epic_aggregation_dates(self):
@@ -256,22 +294,62 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         epic = _epic("VP-600")
         pre = _issue(
             "VP-601",
-            "QA | WEB | pre-prod validation",
+            "QA | WEB | Pre-Prod | validation",
             7200,
             parent_key="VP-600",
         )
-        uat = _issue("VP-602", "QA | WEB | UAT stage", 3600, parent_key="VP-600")
+        uat = _issue("VP-602", "WEB | UAT | sign-off", 3600, parent_key="VP-600")
         result = build_timeline_breakdown([epic, pre, uat], {"scheduled": []}, MINIMAL_CONFIG)[0]
         pre_row = _stage_row(result, "frontend", "Pre-Prod testing")
         uat_row = _stage_row(result, "frontend", "UAT")
         self.assertEqual(pre_row["effortsHours"], 2.0)
         self.assertEqual(uat_row["effortsHours"], 1.0)
 
+    def test_qa_web_prod_testing_is_preprod(self):
+        epic = _epic("VP-605")
+        task = _issue(
+            "VP-606",
+            "QA | WEB | Prod testing | regression",
+            5400,
+            parent_key="VP-605",
+        )
+        result = build_timeline_breakdown([epic, task], {"scheduled": []}, MINIMAL_CONFIG)[0]
+        pre_row = _stage_row(result, "frontend", "Pre-Prod testing")
+        stage_row = _stage_row(result, "frontend", STAGE_STAGE_TESTING)
+        self.assertEqual(pre_row["effortsHours"], 1.5)
+        self.assertIsNone(stage_row["effortsHours"])
+
+    def test_qa_be_final_testing_is_prod_final(self):
+        epic = _epic("VP-607")
+        task = _issue(
+            "VP-608",
+            "QA | BE | Final Testing | API validation",
+            7200,
+            parent_key="VP-607",
+        )
+        result = build_timeline_breakdown([epic, task], {"scheduled": []}, MINIMAL_CONFIG)[0]
+        prod_final = _stage_row(result, "backend", STAGE_PROD_FINAL_TESTING)
+        self.assertEqual(prod_final["effortsHours"], 2.0)
+
+    def test_product_design_team_row(self):
+        epic = _epic("VP-609")
+        uat = _issue(
+            "VP-610",
+            "WEB | UAT | done with product team",
+            3600,
+            parent_key="VP-609",
+            assignee="Pat",
+        )
+        result = build_timeline_breakdown([epic, uat], {"scheduled": []}, MINIMAL_CONFIG)[0]
+        self.assertIn("Product + Design", result["teamSummary"])
+        self.assertEqual(result["teamSummary"]["Product + Design"]["taskCount"], 1)
+        self.assertIn("Pat", [m["member"] for m in result["membersBySide"]["Product + Design"]])
+
     def test_mobile_preprod_not_web(self):
         epic = _epic("VP-601")
         mob = _issue(
             "VP-602",
-            "QA | APP | mobile pre-prod",
+            "QA | APP | Pre-Prod | regression",
             3600,
             parent_key="VP-601",
         )

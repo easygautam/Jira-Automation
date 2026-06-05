@@ -29,10 +29,11 @@ from sprintkit.stages import (
     STAGE_DEVELOPMENT,
     STAGE_STAGE_FINAL_TESTING,
     STAGE_STAGE_TESTING,
+    TEAM_PRODUCT_DESIGN,
     classify_issue,
 )
 
-TEAM_PLAN_SIDES = ("Backend", "Web", "Mobile", "QA", "Other")
+TEAM_PLAN_SIDES = ("Backend", "Web", "Mobile", "Product + Design", "QA", "Other")
 
 
 def side_display(team: str, side_display_map: dict[str, str]) -> str:
@@ -319,10 +320,13 @@ def build_timeline_breakdown(
                 bucket_map[stage_name] = _empty_stage_bucket()
 
             b = bucket_map[stage_name]
-            if classification.get("team") == "qa":
+            work_team = classification.get("team") or platform
+            if work_team == "qa":
                 member_side = side_display("qa", side_display_map)
+            elif work_team == TEAM_PRODUCT_DESIGN:
+                member_side = side_display(TEAM_PRODUCT_DESIGN, side_display_map)
             else:
-                member_side = side_display(classification.get("team") or platform, side_display_map)
+                member_side = side_display(work_team, side_display_map)
 
             b["effortsHours"] += est_h
             if b.get("source") != "synthetic":

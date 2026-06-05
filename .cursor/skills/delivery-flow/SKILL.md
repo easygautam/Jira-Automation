@@ -68,14 +68,17 @@ Per-epic **Execution stages** tables are **per platform** (`timeline.executionSt
 | Platform | Stage order (summary) |
 |----------|------------------------|
 | Backend | Tech Solutioning → QA Test Planning → Development → Stage testing → Bug fixes (10% of dev) → Stage final testing (10% of stage testing) → Prod release → Prod final testing → Go live date |
-| Web / Mobile | Tech Solutioning → QA Test Planning → Development → Stage testing → Bug fixes → Stage final testing → Pre-Prod testing → UAT → Ready for release → Go live date |
+| Web / Mobile | Tech Solutioning → QA Test Planning → Development → Stage testing → Bug fixes → Stage final testing → Pre-Prod testing → UAT → Go live date |
 
-**Jira mapping highlights:**
+**Jira mapping highlights (pipe-segment only):**
 
-- `{BE\|Web\|App prefix} \| Assessment` → platform **Tech Solutioning**
+- `{BE\|Web\|App} \| Assessment` → platform **Tech Solutioning**
 - `QA \| {App\|Web\|BE} \| Assessment` (or Test Planning in title) → **QA Test Planning** on that platform only
 - `QA \| {Platform} \| Automation \| …` → Stage testing on that platform
-- Other `QA \| {Platform} \| …` → Stage testing or release stages (Pre-Prod, UAT, Ready for release are **separate** rows per Web/Mobile)
+- `QA \| {Web\|App} \| Pre-Prod\|Pre-Prod Testing\|Final Testing\|Prod testing \| …` → **Pre-Prod testing**
+- `QA \| BE \| Final Testing \| …` → **Prod final testing** (backend; not Pre-Prod)
+- `{Web\|App} \| UAT \| …` → **UAT** (Teams plan: **Product + Design**); `QA \| {Platform} \| UAT …` → Stage testing (QA does not own UAT)
+- Other `QA \| {Platform} \| …` → Stage testing
 - `QA \| …` without platform segment → unmapped + data-quality flag
 - Pipe-prefix dev tasks → Development; buffers in `timeline.effortBuffers`
 

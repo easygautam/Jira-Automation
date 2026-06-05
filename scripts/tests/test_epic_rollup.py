@@ -8,7 +8,13 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from sprintkit.jira_model import epic_jira_sort_key, epic_summary  # noqa: E402
-from sprintkit.render.markdown import jira_issue_keys_linked, jira_issue_link  # noqa: E402
+from sprintkit.render.markdown import (  # noqa: E402
+    derive_jira_site_url_from_issues,
+    jira_issue_keys_linked,
+    jira_issue_link,
+    linkify_bare_issue_keys,
+    resolve_jira_site_url,
+)
 from sprintkit.render.sections import compute_epic_rollup, worst_status  # noqa: E402
 
 
@@ -50,6 +56,50 @@ class TestEpicRollup(unittest.TestCase):
         self.assertNotIn("…", linked)
         for k in keys:
             self.assertIn(f"[{k}]({site}/browse/{k})", linked)
+
+    def test_derive_site_url_from_issue_icon(self):
+        issues = [
+            {
+                "key": "VP-1",
+                "fields": {
+                    "status": {
+                        "iconUrl": "https://physicswallah001.atlassian.net/images/icons/inprogress.png"
+                    }
+                },
+            }
+        ]
+        self.assertEqual(
+            derive_jira_site_url_from_issues(issues),
+            "https://physicswallah001.atlassian.net",
+        )
+
+    def test_resolve_site_url_from_issues_when_config_missing(self):
+        issues = [
+            {
+                "key": "VP-2",
+                "fields": {
+                    "priority": {
+                        "iconUrl": "https://demo.atlassian.net/images/icons/priorities/high.svg"
+                    }
+                },
+            }
+        ]
+        self.assertEqual(
+            resolve_jira_site_url(None, {}, issues),
+            "https://demo.atlassian.net",
+        )
+
+    def test_linkify_bare_issue_keys(self):
+        site = "https://physicswallah001.atlassian.net"
+        text = "| VP-99 | Title | and VP-100 done"
+        linked = linkify_bare_issue_keys(text, site, project_key="VP")
+        self.assertIn(f"[VP-99]({site}/browse/VP-99)", linked)
+        self.assertIn(f"[VP-100]({site}/browse/VP-100)", linked)
+
+    def test_linkify_skips_already_linked_keys(self):
+        site = "https://physicswallah001.atlassian.net"
+        text = f"[VP-1]({site}/browse/VP-1)"
+        self.assertEqual(linkify_bare_issue_keys(text, site), text)
 
     def test_epic_summary_from_parent(self):
         issues = [

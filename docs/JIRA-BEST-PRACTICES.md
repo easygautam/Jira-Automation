@@ -168,14 +168,17 @@ QA | BE | API contract testing
 
 Set **Original Estimate** and assign to the QA owner.
 
-### Web and Mobile — Pre-Prod and UAT
+### Web and Mobile — Pre-Prod (QA) and UAT (Product + Design)
 
-Create **separate tasks** for Pre-Prod and UAT. Do not combine both in one summary.
+Create **separate tasks** for Pre-Prod and UAT. Stage is determined by **pipe segment 3** (QA) or **segment 2** (UAT) — not keywords elsewhere in the title.
 
 | Phase | Web example | Mobile example |
 |-------|-------------|----------------|
-| Pre-Prod | `QA \| WEB \| pre-prod regression` | `QA \| APP \| pre-prod regression` |
-| UAT | `QA \| WEB \| UAT sign-off` | `QA \| APP \| UAT sign-off` |
+| Pre-Prod | `QA \| WEB \| Pre-Prod \| regression` | `QA \| APP \| Pre-Prod \| regression` |
+| Pre-Prod (alt) | `QA \| WEB \| Prod testing \| smoke` | `QA \| APP \| Final Testing \| e2e` |
+| UAT | `WEB \| UAT \| sign-off with product` | `APP \| UAT \| design review` |
+
+QA never owns UAT. Do **not** use `QA \| WEB \| UAT …` for product UAT — that maps to **Stage testing**.
 
 ### Ready for release — status only (no task)
 
@@ -192,8 +195,8 @@ Create tasks when there is real work to do and estimate:
 
 | Phase | Example summary |
 |-------|-----------------|
-| Prod release | `BE \| prod release — events API` |
-| Prod final testing | `BE \| prod final testing` or `QA \| BE \| prod final testing` |
+| Prod release | `BE \| Prod release \| events API` |
+| Prod final testing | `BE \| Prod final testing \| smoke` or `QA \| BE \| Final Testing \| API validation` |
 
 Set **Original Estimate** and dates like other tasks.
 

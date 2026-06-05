@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import re
 from typing import Any
+
+_ATLASSIAN_SITE_RE = re.compile(r"https://[a-zA-Z0-9-]+\.atlassian\.net")
+# Bare keys only — skip keys already in [KEY](url) or .../browse/KEY
+_BARE_ISSUE_KEY_RE = re.compile(
+    r"(?<!\[)(?<!browse/)(?<!/)\b([A-Z][A-Z0-9]+-\d+)\b(?!\]\()"
+)
 
 
 def jira_browse_url(site_url: str, issue_key: str) -> str:
@@ -10,15 +18,53 @@ def jira_browse_url(site_url: str, issue_key: str) -> str:
     return f"{base}/browse/{issue_key}"
 
 
+def derive_jira_site_url_from_issues(issues: list[dict[str, Any]] | None) -> str | None:
+    """Infer site base URL from Jira issue payloads (iconUrl, self, etc.)."""
+    if not issues:
+        return None
+    for issue in issues:
+        try:
+            blob = json.dumps(issue, default=str)
+        except (TypeError, ValueError):
+            continue
+        match = _ATLASSIAN_SITE_RE.search(blob)
+        if match:
+            return match.group(0)
+    return None
+
+
 def resolve_jira_site_url(
     jira_site_url: str | None,
     config: dict[str, Any] | None,
+    issues: list[dict[str, Any]] | None = None,
 ) -> str | None:
+    """Resolve browse base URL: CLI override → config → derive from issues."""
     if jira_site_url:
-        return jira_site_url
+        return jira_site_url.rstrip("/")
     if config:
-        return (config.get("jira") or {}).get("siteUrl")
-    return None
+        configured = (config.get("jira") or {}).get("siteUrl")
+        if configured:
+            return str(configured).rstrip("/")
+    return derive_jira_site_url_from_issues(issues)
+
+
+def linkify_bare_issue_keys(
+    text: str,
+    site_url: str | None,
+    *,
+    project_key: str | None = None,
+) -> str:
+    """Wrap any remaining bare PROJ-123 keys as browse links (idempotent)."""
+    if not site_url or not text:
+        return text
+
+    def _repl(match: re.Match[str]) -> str:
+        key = match.group(1)
+        if project_key and not key.startswith(f"{project_key}-"):
+            return key
+        return jira_issue_link(site_url, key)
+
+    return _BARE_ISSUE_KEY_RE.sub(_repl, text)
 
 
 def jira_issue_link(site_url: str | None, issue_key: str | None) -> str:
