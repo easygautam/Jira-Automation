@@ -25,12 +25,10 @@ from sprintkit.stages import (
     DEFAULT_EXECUTION_STAGES,
     PLATFORM_KEYS,
     PLATFORM_SIDE,
-    QA_CROSS,
     STAGE_BUG_FIXES,
     STAGE_DEVELOPMENT,
     STAGE_STAGE_FINAL_TESTING,
     STAGE_STAGE_TESTING,
-    STAGE_TEST_PLANNING,
     classify_issue,
 )
 
@@ -41,12 +39,6 @@ def side_display(team: str, side_display_map: dict[str, str]) -> str:
     if team in ("other", "unknown"):
         return side_display_map.get("other") or side_display_map.get("unknown", "Other")
     return side_display_map.get(team, side_display_map.get("other", "Other"))
-
-
-def platform_side(platform: str, side_display_map: dict[str, str]) -> str:
-    if platform == QA_CROSS:
-        return side_display_map.get("qa", "QA")
-    return PLATFORM_SIDE.get(platform, side_display_map.get("other", "Other"))
 
 
 def calc_days(
@@ -233,7 +225,6 @@ def build_timeline_breakdown(
     hours_per_day = float(timeline_cfg.get("hoursPerDay", 6))
     side_display_map = timeline_cfg.get("sideDisplay") or {}
     execution_stages = timeline_cfg.get("executionStages") or DEFAULT_EXECUTION_STAGES
-    qa_stages = timeline_cfg.get("qaCrossPlatformStages") or [STAGE_TEST_PLANNING]
     buffers = timeline_cfg.get("effortBuffers") or {}
 
     index = {i["key"]: i for i in issues if i.get("key")}
@@ -262,7 +253,6 @@ def build_timeline_breakdown(
             p: _init_platform_buckets(execution_stages.get(p, DEFAULT_EXECUTION_STAGES[p]))
             for p in PLATFORM_KEYS
         }
-        qa_buckets = _init_platform_buckets(list(qa_stages))
         leave_by_side: dict[str, dict[str, float]] = defaultdict(
             lambda: {"planned": 0.0, "unplanned": 0.0}
         )
@@ -324,14 +314,12 @@ def build_timeline_breakdown(
             if not platform or not stage_name:
                 continue
 
-            bucket_map = qa_buckets if platform == QA_CROSS else platform_buckets[platform]
+            bucket_map = platform_buckets[platform]
             if stage_name not in bucket_map:
                 bucket_map[stage_name] = _empty_stage_bucket()
 
             b = bucket_map[stage_name]
-            if platform == QA_CROSS:
-                member_side = platform_side(platform, side_display_map)
-            elif classification.get("team") == "qa":
+            if classification.get("team") == "qa":
                 member_side = side_display("qa", side_display_map)
             else:
                 member_side = side_display(classification.get("team") or platform, side_display_map)
@@ -381,13 +369,6 @@ def build_timeline_breakdown(
                 platform, order, platform_buckets[platform], hours_per_day
             )
 
-        qa_block = {
-            "stages": [
-                _stage_to_row(name, qa_buckets.get(name, _empty_stage_bucket()), hours_per_day)
-                for name in qa_stages
-            ]
-        }
-
         members_by_side = build_members_by_side(member_stats, hours_per_day)
         team_summary: dict[str, Any] = {}
         for side in TEAM_PLAN_SIDES:
@@ -396,8 +377,6 @@ def build_timeline_breakdown(
             stage_rows = (
                 execution_out[plat_key]["stages"] if plat_key and plat_key in execution_out else []
             )
-            if side == "QA":
-                stage_rows = qa_block["stages"]
             if not stage_rows and not members:
                 continue
             peak = max((r.get("resources") or 0) for r in stage_rows) if stage_rows else 0
@@ -406,8 +385,6 @@ def build_timeline_breakdown(
             total_effort = sum(m.get("effortsHours") or 0 for m in members)
             task_count = sum(m.get("issueCount", 0) for m in members)
             if not total_effort and stage_rows:
-                # Effort came from cross-team stage work (e.g. QA testing on this
-                # platform); count the stage's mapped tasks so Tasks matches effort.
                 total_effort = sum(r.get("effortsHours") or 0 for r in stage_rows)
                 task_count = len(_stage_task_keys(stage_rows))
             total_leave = sum(m.get("plannedLeaveHours") or 0 for m in members)
@@ -426,7 +403,6 @@ def build_timeline_breakdown(
                 "epicKey": epic_key,
                 "prdName": epic_summary(epic_key, issues, index),
                 "executionStages": execution_out,
-                "qaCrossPlatform": qa_block,
                 "teamSummary": team_summary,
                 "membersBySide": members_by_side,
                 "unmapped": unmapped,

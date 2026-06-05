@@ -11,8 +11,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from sprintkit.stages import (  # noqa: E402
     STAGE_DEVELOPMENT,
+    STAGE_QA_TEST_PLANNING,
     STAGE_STAGE_TESTING,
-    STAGE_TEST_PLANNING,
+    STAGE_TECH_SOLUTIONING,
     classify_issue,
 )
 from sprintkit.timeline import build_timeline_breakdown, calc_days  # noqa: E402
@@ -58,8 +59,14 @@ MINIMAL_CONFIG = {
     "teams": {
         "backend": ["backend", "be"],
         "frontend": ["frontend", "web"],
-        "mobile": ["mobile", "android"],
+        "mobile": ["mobile", "android", "app"],
         "qa": ["qa", "test"],
+    },
+    "teamPrefixMapping": {
+        "qa": {"aliases": ["qa"]},
+        "backend": {"aliases": ["be", "backend"]},
+        "frontend": {"aliases": ["web", "frontend"]},
+        "mobile": {"aliases": ["app", "mobile", "android"]},
     },
     "timeline": {
         "hoursPerDay": 6,
@@ -85,7 +92,8 @@ MINIMAL_CONFIG = {
         },
         "executionStages": {
             "backend": [
-                "Assessment",
+                "Tech Solutioning",
+                "QA Test Planning",
                 "Development",
                 "Stage testing",
                 "Bug fixes",
@@ -95,7 +103,8 @@ MINIMAL_CONFIG = {
                 "Go live date",
             ],
             "frontend": [
-                "Assessment",
+                "Tech Solutioning",
+                "QA Test Planning",
                 "Development",
                 "Stage testing",
                 "Bug fixes",
@@ -106,7 +115,8 @@ MINIMAL_CONFIG = {
                 "Go live date",
             ],
             "mobile": [
-                "Assessment",
+                "Tech Solutioning",
+                "QA Test Planning",
                 "Development",
                 "Stage testing",
                 "Bug fixes",
@@ -117,7 +127,6 @@ MINIMAL_CONFIG = {
                 "Go live date",
             ],
         },
-        "qaCrossPlatformStages": ["Test planning"],
         "stageMapping": [],
     },
 }
@@ -140,32 +149,68 @@ class TestClassifyIssue(unittest.TestCase):
     def test_planned_leave(self):
         issue = _issue("VP-1", "Leave | Planned - doctor", 7200)
         cfg = MINIMAL_CONFIG["timeline"]
-        result = classify_issue(issue, cfg, MINIMAL_CONFIG["teams"])
+        result = classify_issue(issue, cfg, MINIMAL_CONFIG["teams"], MINIMAL_CONFIG)
         self.assertEqual(result["kind"], "leave")
         self.assertEqual(result["leaveType"], "planned")
 
-    def test_be_assessment_prefix(self):
+    def test_be_assessment_maps_to_tech_solutioning(self):
         issue = _issue("VP-2", "BE | Assessment", 3600)
-        result = classify_issue(issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"])
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
         self.assertEqual(result["platform"], "backend")
-        self.assertEqual(result["stage"], "Assessment")
+        self.assertEqual(result["stage"], STAGE_TECH_SOLUTIONING)
 
     def test_be_development_pipe(self):
         issue = _issue("VP-2", "BE || Add endpoint", 14400)
-        result = classify_issue(issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"])
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
         self.assertEqual(result["kind"], "work")
         self.assertEqual(result["stage"], STAGE_DEVELOPMENT)
         self.assertEqual(result["platform"], "backend")
 
-    def test_qa_assessment_cross_platform(self):
+    def test_qa_assessment_without_platform_unmapped(self):
         issue = _issue("VP-3", "QA | Assessment", 7200)
-        result = classify_issue(issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"])
-        self.assertEqual(result["platform"], "qa_cross")
-        self.assertEqual(result["stage"], STAGE_TEST_PLANNING)
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
+        self.assertEqual(result["kind"], "unmapped")
+        self.assertEqual(result["team"], "qa")
+
+    def test_qa_app_assessment_test_planning(self):
+        issue = _issue("VP-3a", "QA | App | Assessment / Test Planning", 7200)
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
+        self.assertEqual(result["platform"], "mobile")
+        self.assertEqual(result["stage"], STAGE_QA_TEST_PLANNING)
+
+    def test_qa_be_automation_stage_testing(self):
+        issue = _issue(
+            "VP-3b",
+            "QA | BE | Automation | integrate events PRD API automation",
+            3600,
+        )
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
+        self.assertEqual(result["platform"], "backend")
+        self.assertEqual(result["stage"], STAGE_STAGE_TESTING)
+
+    def test_qa_web_e2e_default_stage_testing(self):
+        issue = _issue("VP-3c", "QA | Web | events PRD e2e", 3600)
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
+        self.assertEqual(result["platform"], "frontend")
+        self.assertEqual(result["stage"], STAGE_STAGE_TESTING)
 
     def test_qa_web_stage_testing(self):
         issue = _issue("VP-4", "QA | WEB | 1st iteration (stage testing)", 3600)
-        result = classify_issue(issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"])
+        result = classify_issue(
+            issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
+        )
         self.assertEqual(result["platform"], "frontend")
         self.assertEqual(result["stage"], STAGE_STAGE_TESTING)
 
@@ -183,9 +228,9 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         }
         result = build_timeline_breakdown([epic, t1, t2], schedule, MINIMAL_CONFIG)
         epic_row = result[0]
-        # Calendar dates are intentionally not produced (no delivery date fields).
         self.assertNotIn("deliveryStart", epic_row)
         self.assertNotIn("deliveryEnd", epic_row)
+        self.assertNotIn("qaCrossPlatform", epic_row)
 
         be_row = _stage_row(epic_row, "backend", STAGE_DEVELOPMENT)
         self.assertNotIn("start", be_row)
@@ -195,7 +240,6 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         self.assertEqual(bug_row["effortsHours"], 0.8)
         self.assertEqual(bug_row["source"], "synthetic")
 
-        # hasWork: platforms with Jira tasks are flagged; empty ones are not.
         self.assertTrue(epic_row["executionStages"]["backend"]["hasWork"])
         self.assertTrue(epic_row["executionStages"]["frontend"]["hasWork"])
         self.assertFalse(epic_row["executionStages"]["mobile"]["hasWork"])
@@ -250,21 +294,27 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         result = build_timeline_breakdown([epic, t1, t2], schedule, MINIMAL_CONFIG)
         backend_members = result[0]["membersBySide"]["Backend"]
         self.assertEqual(len(backend_members), 2)
-        # Member rows no longer carry start/end (calendar dates not produced).
         for member in backend_members:
             self.assertNotIn("start", member)
             self.assertNotIn("end", member)
 
-    def test_qa_test_planning_not_tripled(self):
+    def test_qa_test_planning_per_platform_only(self):
         epic = _epic("VP-700")
-        qa = _issue("VP-701", "QA | Assessment", 9000, parent_key="VP-700")
+        qa = _issue("VP-701", "QA | App | Assessment", 9000, parent_key="VP-700")
         result = build_timeline_breakdown([epic, qa], {"scheduled": []}, MINIMAL_CONFIG)[0]
-        qa_rows = result["qaCrossPlatform"]["stages"]
-        planning = next(r for r in qa_rows if r["stage"] == STAGE_TEST_PLANNING)
-        self.assertEqual(planning["effortsHours"], 2.5)
-        for plat in ("backend", "frontend", "mobile"):
-            assess = _stage_row(result, plat, "Assessment")
-            self.assertIsNone(assess["effortsHours"])
+        self.assertNotIn("qaCrossPlatform", result)
+        mob_planning = _stage_row(result, "mobile", STAGE_QA_TEST_PLANNING)
+        self.assertEqual(mob_planning["effortsHours"], 2.5)
+        for plat in ("backend", "frontend"):
+            planning = _stage_row(result, plat, STAGE_QA_TEST_PLANNING)
+            self.assertIsNone(planning["effortsHours"])
+
+    def test_legacy_qa_assessment_unmapped(self):
+        epic = _epic("VP-800")
+        qa = _issue("VP-801", "QA | Assessment", 3600, parent_key="VP-800")
+        result = build_timeline_breakdown([epic, qa], {"scheduled": []}, MINIMAL_CONFIG)[0]
+        self.assertEqual(len(result["unmapped"]), 1)
+        self.assertEqual(result["unmapped"][0]["key"], "VP-801")
 
 
 if __name__ == "__main__":

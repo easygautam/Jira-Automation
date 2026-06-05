@@ -350,11 +350,8 @@ def render_timeline_sections(
             for label, block in platform_blocks
             if block and block.get("hasWork") and block.get("stages")
         ]
-        qa_x = epic.get("qaCrossPlatform") or {}
-        qa_rows = qa_x.get("stages") or []
-        qa_has_effort = bool(qa_rows) and any(r.get("effortsHours") for r in qa_rows)
 
-        if active_platforms or qa_has_effort:
+        if active_platforms:
             lines.append("")
             lines.append("#### Execution stages")
             lines.append("")
@@ -362,10 +359,6 @@ def render_timeline_sections(
                 lines.append(f"**{label}**")
                 lines.append("")
                 _render_stage_table(block["stages"])
-            if qa_has_effort:
-                lines.append("**QA (all platforms)**")
-                lines.append("")
-                _render_stage_table(qa_rows)
 
         unmapped = epic.get("unmapped") or []
         if unmapped:

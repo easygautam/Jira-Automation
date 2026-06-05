@@ -8,6 +8,7 @@ Unmapped work), and the active sprint window is resolved from the Jira field.
 from __future__ import annotations
 
 import json
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -64,8 +65,8 @@ class TestPipelineGolden(unittest.TestCase):
             "| Epic ID | Epic Name | Backend | Web | Mobile | QA | Other | Total | Bugs |",
             self.md,
         )
-        # The single Web bug (1h) reconciles into the side summary.
-        self.assertIn("Web 1.0", self.md)
+        # The single Web bug (1h) appears in epic member detail.
+        self.assertIn("Bob Web | 1.0", self.md)
 
     def test_no_placeholder_start_end_columns(self):
         self.assertNotIn("| Start | End |", self.md)
@@ -80,9 +81,25 @@ class TestPipelineGolden(unittest.TestCase):
         self.assertEqual(preceding[-2], "")
 
     def test_standup_summary_renders(self):
-        text = standup_summary(self.result, self.issues, self.config)
+        text = standup_summary(
+            self.result,
+            self.issues,
+            self.config,
+            jira_site_url="https://example.atlassian.net",
+        )
         self.assertIn("Standup — Demo Sprint", text)
         self.assertIn("Status:", text)
+        self.assertIn("[VP-901](https://example.atlassian.net/browse/VP-901)", text)
+
+    def test_no_qa_all_platforms_section(self):
+        self.assertNotIn("QA (all platforms)", self.md)
+
+    def test_all_issue_keys_in_report_are_linked(self):
+        """Table cells and lists must not contain bare VP- keys (browse links required)."""
+        bare_table_key = re.search(r"\|\s+VP-\d+\s+\|", self.md)
+        self.assertIsNone(bare_table_key, "found unlinked issue key in table")
+        bare_bullet_key = re.search(r"^- VP-\d+:", self.md, re.MULTILINE)
+        self.assertIsNone(bare_bullet_key, "found unlinked issue key in list")
 
 
 if __name__ == "__main__":

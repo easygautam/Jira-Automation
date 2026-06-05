@@ -67,14 +67,16 @@ Per-epic **Execution stages** tables are **per platform** (`timeline.executionSt
 
 | Platform | Stage order (summary) |
 |----------|------------------------|
-| Backend | Assessment → Development → Stage testing → Bug fixes (10% of dev) → Stage final testing (10% of stage testing) → Prod release → Prod final testing → Go live date |
-| Web / Mobile | Assessment → Development → Stage testing → Bug fixes → Stage final testing → Pre-Prod testing → UAT → Ready for release → Go live date |
+| Backend | Tech Solutioning → QA Test Planning → Development → Stage testing → Bug fixes (10% of dev) → Stage final testing (10% of stage testing) → Prod release → Prod final testing → Go live date |
+| Web / Mobile | Tech Solutioning → QA Test Planning → Development → Stage testing → Bug fixes → Stage final testing → Pre-Prod testing → UAT → Ready for release → Go live date |
 
 **Jira mapping highlights:**
 
-- `{BE\|Web\|App prefix} \| Assessment` → platform Assessment
-- `QA \| Assessment` (no Web/Mobile/BE stream) → **QA (all platforms)** Test planning (once, not triple-counted)
-- `QA \| Web` / `QA \| Mobile` / `QA \| BE` → Stage testing or release stages on that platform (Pre-Prod, UAT, Ready for release are **separate** rows per Web/Mobile)
+- `{BE\|Web\|App prefix} \| Assessment` → platform **Tech Solutioning**
+- `QA \| {App\|Web\|BE} \| Assessment` (or Test Planning in title) → **QA Test Planning** on that platform only
+- `QA \| {Platform} \| Automation \| …` → Stage testing on that platform
+- Other `QA \| {Platform} \| …` → Stage testing or release stages (Pre-Prod, UAT, Ready for release are **separate** rows per Web/Mobile)
+- `QA \| …` without platform segment → unmapped + data-quality flag
 - Pipe-prefix dev tasks → Development; buffers in `timeline.effortBuffers`
 
 **Team on tasks:** first `|` prefix via `scripts/sprintkit/teams.py` + stage mapping in `scripts/sprintkit/stages.py` (see `jira-domain`). Timeline effort counts **Task/Sub-task** only; **Bug** effort is a separate report section (worklog). Timeline does not bucket Bug issue types.

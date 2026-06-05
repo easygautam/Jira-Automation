@@ -9,15 +9,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from sprintkit.jira_model import build_index  # noqa: E402
 from sprintkit.quality import (  # noqa: E402
     REASON_EPIC_NOT_MAPPED,
     REASON_MISSING_ESTIMATE,
     REASON_MISSING_LOGGED_TIME,
     REASON_PARENT_NOT_MAPPED,
     REASON_PARENT_OUT_OF_SCOPE,
+    REASON_QA_MISSING_PLATFORM,
     REASON_TIMELINE_UNMAPPED,
     REASON_UNASSIGNED,
     build_data_quality_by_member,
+    collect_issue_flags,
     consolidate_dq_rows,
     count_dq_reasons,
 )
@@ -288,6 +291,22 @@ class TestDataQuality(unittest.TestCase):
         counts = count_dq_reasons(by_member)
         self.assertEqual(counts[REASON_MISSING_ESTIMATE], 1)
         self.assertEqual(counts[REASON_UNASSIGNED], 1)
+
+    def test_qa_missing_platform_segment(self):
+        issue = _issue("VP-99", "QA | Assessment", parent_key="VP-EPIC", assignee="Carol")
+        config = {
+            **CONFIG,
+            "teams": {"qa": ["qa"]},
+            "teamPrefixMapping": {
+                "qa": {"aliases": ["qa"]},
+                "backend": {"aliases": ["be"]},
+                "frontend": {"aliases": ["web"]},
+                "mobile": {"aliases": ["app"]},
+            },
+        }
+        index = build_index([issue])
+        reasons = collect_issue_flags(issue, index, set(), config)
+        self.assertIn(REASON_QA_MISSING_PLATFORM, reasons)
 
     def test_timeline_unmapped(self):
         epic = _epic("VP-2")

@@ -49,4 +49,4 @@ Leave tasks: summary starts with `Leave |` (see `timeline.leaveTaskPrefixes`). `
 
 ## Team from summary
 
-First `|` segment only → `scripts/sprintkit/teams.py` + `teamPrefixMapping` in config. Unmatched or no pipe → **Other**. QA on `QA | APP | …` is QA, not Mobile. Stage/leave mapping lives in `scripts/sprintkit/stages.py`: `{prefix} | Assessment` → platform Assessment; `QA | Assessment` → cross-platform test planning; `qa_platform_stream()` scopes `QA | Web/Mobile/BE` to frontend/mobile/backend. Full alias list lives in config, not duplicated here.
+First `|` segment only → `scripts/sprintkit/teams.py` + `teamPrefixMapping` in config. Unmatched or no pipe → **Other**. QA on `QA | APP | …` is QA, not Mobile. Stage/leave mapping lives in `scripts/sprintkit/stages.py`: `{BE|Web|App} | Assessment` → **Tech Solutioning**; `QA | {App|Web|BE} | Assessment` → **QA Test Planning** on that platform (`qa_platform_from_segment()` reads segment 2 only); `QA | {Platform} | Automation` → Stage testing; QA without platform → unmapped. Full alias list lives in config, not duplicated here.

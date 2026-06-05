@@ -13,6 +13,7 @@ from typing import Any
 from sprintkit.bugs import build_bug_effort_breakdown
 from sprintkit.normalize import normalize
 from sprintkit.quality import build_data_quality_by_member, count_dq_reasons
+from sprintkit.render.markdown import jira_issue_link, resolve_jira_site_url
 from sprintkit.render.report import render_report
 from sprintkit.schedule import compute_schedule
 from sprintkit.sprint_window import extract_active_sprint
@@ -130,9 +131,11 @@ def standup_summary(
     result: PipelineResult,
     issues: list[dict[str, Any]],
     config: dict[str, Any] | None = None,
+    jira_site_url: str | None = None,
 ) -> str:
     """Short chat-oriented standup text: blockers, overdue, at-risk, DQ counts."""
     issue_by_key = {i["key"]: i for i in issues}
+    site = resolve_jira_site_url(jira_site_url, config)
     today = result.engine.get("today", date.today().isoformat())
     sprint_end = result.sprint_meta.get("sprintEnd", "")
 
@@ -153,7 +156,7 @@ def standup_summary(
     def _summ(key: str) -> str:
         issue = issue_by_key.get(key, {})
         title = ((issue.get("fields") or {}).get("summary") or key)[:70]
-        return f"- {key}: {title}"
+        return f"- {jira_issue_link(site, key)}: {title}"
 
     lines = [
         f"Standup — {result.sprint_meta.get('sprintName', 'Active Sprint')} "

@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from sprintkit.jira_model import epic_jira_sort_key, epic_summary  # noqa: E402
-from sprintkit.render.markdown import jira_issue_link  # noqa: E402
+from sprintkit.render.markdown import jira_issue_keys_linked, jira_issue_link  # noqa: E402
 from sprintkit.render.sections import compute_epic_rollup, worst_status  # noqa: E402
 
 
@@ -42,6 +42,14 @@ class TestEpicRollup(unittest.TestCase):
             "[VP-19350](https://physicswallah001.atlassian.net/browse/VP-19350)",
         )
         self.assertEqual(jira_issue_link(None, "VP-1"), "VP-1")
+
+    def test_jira_issue_keys_linked_all_keys(self):
+        site = "https://physicswallah001.atlassian.net"
+        keys = ["VP-1", "VP-2", "VP-3", "VP-4", "VP-5"]
+        linked = jira_issue_keys_linked(site, keys)
+        self.assertNotIn("…", linked)
+        for k in keys:
+            self.assertIn(f"[{k}]({site}/browse/{k})", linked)
 
     def test_epic_summary_from_parent(self):
         issues = [

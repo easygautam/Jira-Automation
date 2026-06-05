@@ -45,7 +45,6 @@ CONFIG = {
             "frontend": ["Development", "Stage testing"],
             "mobile": ["Development", "Stage testing"],
         },
-        "qaCrossPlatformStages": ["Test planning"],
         "stageMapping": [],
     },
 }
@@ -127,6 +126,12 @@ class TestPipePrefix(unittest.TestCase):
         self.assertEqual(result["team"], "qa")
         self.assertEqual(result["stage"], "Stage testing")
         self.assertEqual(result["platform"], "mobile")
+
+    def test_qa_assessment_without_platform_unmapped(self):
+        issue = _issue("QA | Assessment")
+        result = classify_issue(issue, CONFIG["timeline"], CONFIG["teams"], CONFIG)
+        self.assertEqual(result["kind"], "unmapped")
+        self.assertEqual(result["team"], "qa")
 
 
 if __name__ == "__main__":

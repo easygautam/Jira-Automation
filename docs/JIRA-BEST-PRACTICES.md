@@ -78,41 +78,51 @@ APP | Registration funnel UI
 
 ## QA titles
 
-All QA work starts with **`QA |`**.
+All QA work starts with **`QA |`** and **must** include a platform in the **second** pipe segment.
 
-### Test planning (all platforms)
+| Segment 2 | Platform |
+|-----------|----------|
+| `WEB` | Web |
+| `APP` | Mobile |
+| `BE` | Backend |
 
-Use when QA is preparing for Backend, Web, and Mobile together (not scoped to one platform):
+Titles without a platform (e.g. `QA | Assessment`, `QA | Test cases — Events`) are **unmapped** and flagged in data quality.
 
-```
-QA | Assessment
-QA | Test cases — Events phase 1
-QA | Test execution planning
-```
+### QA Assessment / Test Planning
 
-Do **not** add `WEB`, `APP`, or `BE` in the title for this cross-platform planning work.
-
-### Work for one platform
-
-Add **WEB**, **APP**, or **BE** after `QA |`:
+Per-platform test planning (maps to **QA Test Planning** on that platform’s execution table):
 
 ```
-QA | WEB | Events PRD — 1st iteration (stage testing)
-QA | APP | Registration — 2nd iteration
-QA | BE | API validation
+QA | App | Assessment / Test Planning
+QA | Web | Assessment
+QA | BE | Assessment
 ```
 
-| Include in title | Platform |
-|------------------|----------|
-| `QA \| WEB \|` | Web |
-| `QA \| APP \|` | Mobile |
-| `QA \| BE \|` | Backend |
+### QA Execution
+
+Default execution work (maps to **Stage testing** on that platform):
+
+```
+QA | App | events PRD e2e
+QA | Web | events PRD e2e
+QA | BE | API testing
+```
+
+### QA Automation
+
+Automation work (maps to **Stage testing** on that platform):
+
+```
+QA | BE | Automation | integrate events PRD API automation
+QA | App | Automation | NSAT test attempts flow automation
+QA | Web | Automation | NSAT test attempts flow automation
+```
 
 ---
 
 ## Delivery phases — what to create in Jira
 
-### Assessment
+### Tech Solutioning (dev assessment)
 
 Create a **Task** or **Sub-task** under the epic:
 
@@ -121,7 +131,16 @@ Create a **Task** or **Sub-task** under the epic:
 | Backend | `BE \| Assessment` |
 | Web | `WEB \| Assessment` |
 | Mobile | `APP \| Assessment` |
-| QA (all platforms) | `QA \| Assessment` |
+
+Maps to **Tech Solutioning** on that platform’s execution table.
+
+### QA Test Planning
+
+| Platform | Summary example |
+|----------|-----------------|
+| Backend | `QA \| BE \| Assessment` |
+| Web | `QA \| WEB \| Assessment` |
+| Mobile | `QA \| APP \| Assessment` |
 
 Set **Original Estimate**, **Assignee**, and add to the sprint.
 

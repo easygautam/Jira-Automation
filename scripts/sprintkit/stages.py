@@ -20,17 +20,18 @@ from sprintkit.jira_model import (
 )
 from sprintkit.teams import (
     TEAM_OTHER,
+    _prefix_tokens,
     load_prefix_alias_sets,
     team_from_first_prefix,
     team_from_issue,
+    team_from_prefix_tokens,
 )
 
 PLATFORM_KEYS = ("backend", "frontend", "mobile")
 PLATFORM_SIDE = {"backend": "Backend", "frontend": "Web", "mobile": "Mobile"}
-QA_CROSS = "qa_cross"
 
-STAGE_TEST_PLANNING = "Test planning"
-STAGE_ASSESSMENT = "Assessment"
+STAGE_TECH_SOLUTIONING = "Tech Solutioning"
+STAGE_QA_TEST_PLANNING = "QA Test Planning"
 STAGE_DEVELOPMENT = "Development"
 STAGE_STAGE_TESTING = "Stage testing"
 STAGE_BUG_FIXES = "Bug fixes"
@@ -44,7 +45,8 @@ STAGE_GO_LIVE = "Go live date"
 
 DEFAULT_EXECUTION_STAGES: dict[str, list[str]] = {
     "backend": [
-        STAGE_ASSESSMENT,
+        STAGE_TECH_SOLUTIONING,
+        STAGE_QA_TEST_PLANNING,
         STAGE_DEVELOPMENT,
         STAGE_STAGE_TESTING,
         STAGE_BUG_FIXES,
@@ -54,7 +56,8 @@ DEFAULT_EXECUTION_STAGES: dict[str, list[str]] = {
         STAGE_GO_LIVE,
     ],
     "frontend": [
-        STAGE_ASSESSMENT,
+        STAGE_TECH_SOLUTIONING,
+        STAGE_QA_TEST_PLANNING,
         STAGE_DEVELOPMENT,
         STAGE_STAGE_TESTING,
         STAGE_BUG_FIXES,
@@ -65,7 +68,8 @@ DEFAULT_EXECUTION_STAGES: dict[str, list[str]] = {
         STAGE_GO_LIVE,
     ],
     "mobile": [
-        STAGE_ASSESSMENT,
+        STAGE_TECH_SOLUTIONING,
+        STAGE_QA_TEST_PLANNING,
         STAGE_DEVELOPMENT,
         STAGE_STAGE_TESTING,
         STAGE_BUG_FIXES,
@@ -98,42 +102,50 @@ def _summary_has_assessment_segment(summary: str) -> bool:
     )
 
 
+def platform_from_pipe_segment(
+    segment: str,
+    config: dict[str, Any] | None = None,
+) -> str | None:
+    """Map a single pipe segment to backend | frontend | mobile, or None."""
+    alias_sets = load_prefix_alias_sets(config)
+    team = team_from_prefix_tokens(_prefix_tokens(segment), alias_sets)
+    if team in PLATFORM_KEYS:
+        return team
+    return None
+
+
+def qa_platform_from_segment(
+    summary: str,
+    config: dict[str, Any] | None = None,
+) -> str | None:
+    """
+    Platform for QA work from the second pipe segment only (QA | App | …).
+    None when segment 2 is missing or not App/Web/BE.
+    """
+    parts = [p.strip() for p in summary.split("|")]
+    if not parts or parts[0].casefold() != "qa":
+        return None
+    if len(parts) < 2:
+        return None
+    return platform_from_pipe_segment(parts[1], config)
+
+
 def assessment_target(
     summary: str,
     config: dict[str, Any] | None = None,
 ) -> str | None:
     """
-    Platform key for Assessment stage, or qa_cross for QA | Assessment.
-    None if title is not an assessment task.
+    Platform key for Tech Solutioning stage on dev assessment tasks.
+    None for QA titles (handled in QA classify block) or non-assessment titles.
     """
     if not _summary_has_assessment_segment(summary):
         return None
     alias_sets = load_prefix_alias_sets(config)
     team = team_from_first_prefix(summary, alias_sets)
     if team == "qa":
-        return QA_CROSS
+        return None
     if team in PLATFORM_KEYS:
         return team
-    return None
-
-
-def qa_platform_stream(summary: str) -> str | None:
-    """
-    When first prefix is QA, return backend | frontend | mobile for scoped QA work.
-    None when QA title has no Web/Mobile/BE stream (cross-platform test planning).
-    """
-    parts = [p.strip().lower() for p in summary.split("|")]
-    if not parts or parts[0] != "qa":
-        return None
-    if len(parts) < 2:
-        return None
-    context = " ".join(parts[1:])
-    if any(x in context for x in ("be", "backend", "api contract")):
-        return "backend"
-    if any(x in context for x in ("app", "mobile", "android", "ios")):
-        return "mobile"
-    if any(x in context for x in ("web", "website", "mweb", "frontend", "fe", "admin")):
-        return "frontend"
     return None
 
 
@@ -191,23 +203,19 @@ def _match_config_stage(
     return None
 
 
-def _is_stage_testing_qa(summary: str) -> bool:
-    lower = summary.lower()
-    if "pre-prod" in lower or "pre prod" in lower:
+def _is_qa_test_planning(summary: str) -> bool:
+    """True when segments after platform contain assessment or test planning."""
+    parts = [p.strip() for p in summary.split("|")]
+    if len(parts) < 3:
         return False
-    if "ready for release" in lower:
-        return False
-    markers = (
-        "1st iteration",
-        "2nd iteration",
-        "iteration",
-        "stage testing",
-        "mweb stage",
-        "admin + bug",
-        "api contract",
-        "automation testing",
-    )
-    return any(m in lower for m in markers)
+    remainder = " ".join(parts[2:]).casefold()
+    return "assessment" in remainder or "test planning" in remainder
+
+
+def _is_qa_automation(summary: str) -> bool:
+    """True when third segment is Automation (QA | Platform | Automation | …)."""
+    parts = [p.strip() for p in summary.split("|")]
+    return len(parts) >= 3 and parts[2].casefold() == "automation"
 
 
 def _qa_scoped_release_stage(summary: str, platform: str) -> str | None:
@@ -304,44 +312,41 @@ def classify_issue(
         return _leave_result("planned", len(prefixes.get("generic") or "Leave |"))
 
     assess_platform = assessment_target(summary, config)
-    if assess_platform == QA_CROSS:
-        return _work(QA_CROSS, STAGE_TEST_PLANNING, "qa")
     if assess_platform in PLATFORM_KEYS:
-        return _work(assess_platform, STAGE_ASSESSMENT, assess_platform)
+        return _work(assess_platform, STAGE_TECH_SOLUTIONING, assess_platform)
 
     team = team_from_issue(issue, teams_cfg, config)
     itype = issue_type_name(issue)
-    qa_stream = qa_platform_stream(summary)
 
     if team == "qa" or itype == "test execution":
-        if qa_stream:
-            release_stage = _qa_scoped_release_stage(summary, qa_stream)
-            if release_stage and qa_stream in ("frontend", "mobile"):
-                return _work(qa_stream, release_stage, "qa")
-            if qa_stream == "backend":
-                prod = _backend_prod_stage(summary)
-                if prod:
-                    return _work("backend", prod, "qa")
-            if _is_stage_testing_qa(summary):
-                return _work(qa_stream, STAGE_STAGE_TESTING, "qa")
-            mapped = _match_config_stage(stage_mapping, qa_stream, summary)
-            if mapped:
-                return _work(qa_stream, mapped, "qa")
-        markers_planning = (
-            "test case",
-            "test cases",
-            "test planning",
-            "test execution",
-            "qa planning",
-        )
-        if any(m in lower for m in markers_planning) or qa_stream is None:
-            return _work(QA_CROSS, STAGE_TEST_PLANNING, "qa")
-        return _work(qa_stream, STAGE_STAGE_TESTING, "qa")
+        qa_platform = qa_platform_from_segment(summary, config)
+        if not qa_platform:
+            return {"kind": "unmapped", "platform": None, "stage": None, "team": "qa"}
 
-    if team == "backend" or qa_stream == "backend":
+        if _is_qa_test_planning(summary):
+            return _work(qa_platform, STAGE_QA_TEST_PLANNING, "qa")
+
+        if _is_qa_automation(summary):
+            return _work(qa_platform, STAGE_STAGE_TESTING, "qa")
+
+        release_stage = _qa_scoped_release_stage(summary, qa_platform)
+        if release_stage and qa_platform in ("frontend", "mobile"):
+            return _work(qa_platform, release_stage, "qa")
+        if qa_platform == "backend":
+            prod = _backend_prod_stage(summary)
+            if prod:
+                return _work("backend", prod, "qa")
+
+        mapped = _match_config_stage(stage_mapping, qa_platform, summary)
+        if mapped:
+            return _work(qa_platform, mapped, "qa")
+
+        return _work(qa_platform, STAGE_STAGE_TESTING, "qa")
+
+    if team == "backend":
         prod = _backend_prod_stage(summary)
         if prod:
-            return _work("backend", prod, team if team != TEAM_OTHER else "backend")
+            return _work("backend", prod, team)
         if "go live" in lower:
             return _work("backend", STAGE_GO_LIVE, "backend")
 

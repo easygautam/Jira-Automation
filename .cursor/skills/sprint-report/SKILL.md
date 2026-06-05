@@ -73,7 +73,7 @@ Executive summary → **Delivery items (Epics)** → **Teams plan** → **Member
 - **Bug fix effort:** Jira **Bug** issues, worklog **time spent**; columns Backend / Web / Mobile / QA / Other / **Total** / Bugs — each bug counts once on its team's side and the columns reconcile to Total. Per-epic member tables (Member, Bug effort, Bug count).
 - **Team tasks plan:** per-assignee scheduled tasks (Key, Task title, Epic, Effort, Status); dates are engine-calculated.
 - **Data quality flags:** reason summary table + one consolidated row per ticket. Tasks/sub-tasks flag `Missing estimates`; bugs in active statuses (`dataQuality.bugActiveStatuses`) skip time flags; `bugNoWorklogStatuses` (Not a Bug) skip worklog checks; other resolved bugs need worklog or get `Missing logged time`.
-- **Jira links:** every issue key renders as a browse link from `jira.siteUrl` (or `--jira-site-url`).
+- **Jira links:** every issue key renders as a browse link from `jira.siteUrl` (or `--jira-site-url`) — Delivery items, Timeline (headings, Issues column, unmapped), Bug fix effort, Team tasks plan, Data quality, Schedule Delta, and `--standup` output. Member **Issues** lists all keys (no truncation). When summarizing sprint health in chat, link keys the same way (`[VP-123]({siteUrl}/browse/VP-123)`).
 
 ## Schedule engine I/O (per assignee)
 

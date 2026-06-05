@@ -62,7 +62,6 @@ CONFIG = {
             "frontend": ["Development"],
             "mobile": ["Development"],
         },
-        "qaCrossPlatformStages": ["Test planning"],
         "stageMapping": [],
     },
 }

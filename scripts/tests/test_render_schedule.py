@@ -74,11 +74,17 @@ class TestJiraIssueLinks(unittest.TestCase):
             "[VP-20013](https://physicswallah001.atlassian.net/browse/VP-20013)",
         )
 
-    def test_issue_keys_linked_truncates(self):
+    def test_issue_keys_linked_all_by_default(self):
         keys = ["VP-1", "VP-2", "VP-3", "VP-4", "VP-5"]
         linked = jira_issue_keys_linked(JIRA_SITE, keys)
+        self.assertIn("[VP-5]", linked)
+        self.assertNotIn("…", linked)
+
+    def test_issue_keys_linked_truncates_when_limit_set(self):
+        keys = ["VP-1", "VP-2", "VP-3", "VP-4", "VP-5"]
+        linked = jira_issue_keys_linked(JIRA_SITE, keys, limit=4)
         self.assertIn("[VP-4]", linked)
-        self.assertNotIn("VP-5", linked)
+        self.assertNotIn("[VP-5]", linked)
         self.assertTrue(linked.endswith("…"))
 
 
@@ -213,7 +219,6 @@ class TestTimelineSectionsRender(unittest.TestCase):
                     "frontend": {"hasWork": False, "stages": web_stages},
                     "mobile": {"hasWork": False, "stages": []},
                 },
-                "qaCrossPlatform": {"stages": []},
                 "teamSummary": {
                     "Backend": {
                         "peakResources": 1.0,

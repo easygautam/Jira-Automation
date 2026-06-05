@@ -13,15 +13,19 @@ from sprintkit.jira_model import (
     estimate_seconds,
     get_field,
     is_bug_issue,
+    is_task_or_subtask,
     issue_type_name,
     resolve_epic,
 )
+from sprintkit.stages import qa_platform_from_segment
+from sprintkit.teams import team_from_issue
 
 REASON_MISSING_ESTIMATE = "Missing estimates"
 REASON_MISSING_LOGGED_TIME = "Missing logged time"
 REASON_PARENT_NOT_MAPPED = "Parent not mapped"
 REASON_EPIC_NOT_MAPPED = "Epic not mapped"
 REASON_PARENT_OUT_OF_SCOPE = "Parent not in sprint"
+REASON_QA_MISSING_PLATFORM = "QA task missing platform segment"
 REASON_TIMELINE_UNMAPPED = "Timeline mapping"
 REASON_UNASSIGNED = "Unassigned"
 
@@ -31,6 +35,7 @@ REASON_SORT_ORDER = (
     REASON_PARENT_NOT_MAPPED,
     REASON_PARENT_OUT_OF_SCOPE,
     REASON_EPIC_NOT_MAPPED,
+    REASON_QA_MISSING_PLATFORM,
     REASON_TIMELINE_UNMAPPED,
     REASON_UNASSIGNED,
 )
@@ -78,6 +83,15 @@ def collect_issue_flags(
 
     if assignee_id(issue) == "unassigned":
         reasons.append(REASON_UNASSIGNED)
+
+    teams_cfg = (config or {}).get("teams") or {}
+    summary = (get_field(issue, "summary") or "").strip()
+    if (
+        is_task_or_subtask(issue)
+        and team_from_issue(issue, teams_cfg, config) == "qa"
+        and qa_platform_from_segment(summary, config) is None
+    ):
+        reasons.append(REASON_QA_MISSING_PLATFORM)
 
     return reasons
 

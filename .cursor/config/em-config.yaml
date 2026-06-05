@@ -112,7 +112,8 @@ timeline:
     stageFinalTestingPercentOfStageTesting: 0.10
   executionStages:
     backend:
-      - Assessment
+      - Tech Solutioning
+      - QA Test Planning
       - Development
       - Stage testing
       - Bug fixes
@@ -121,7 +122,8 @@ timeline:
       - Prod final testing
       - Go live date
     frontend:
-      - Assessment
+      - Tech Solutioning
+      - QA Test Planning
       - Development
       - Stage testing
       - Bug fixes
@@ -131,7 +133,8 @@ timeline:
       - Ready for release
       - Go live date
     mobile:
-      - Assessment
+      - Tech Solutioning
+      - QA Test Planning
       - Development
       - Stage testing
       - Bug fixes
@@ -140,8 +143,6 @@ timeline:
       - UAT
       - Ready for release
       - Go live date
-  qaCrossPlatformStages:
-    - Test planning
   leaveMappingRules:
     - { keywords: ["leave | planned"], leaveType: planned }
     - { keywords: ["leave | unplanned"], leaveType: unplanned }

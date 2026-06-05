@@ -33,13 +33,14 @@ def jira_issue_keys_linked(
     site_url: str | None,
     keys: list[str] | None,
     *,
-    limit: int = 4,
+    limit: int | None = None,
 ) -> str:
+    """Comma-separated browse links for issue keys. No limit by default (all keys)."""
     if not keys:
         return "—"
-    shown = keys[:limit]
+    shown = keys if limit is None else keys[:limit]
     parts = [jira_issue_link(site_url, k) for k in shown]
-    suffix = "…" if len(keys) > limit else ""
+    suffix = "…" if limit is not None and len(keys) > limit else ""
     return ", ".join(parts) + suffix
 
 

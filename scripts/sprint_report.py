@@ -105,7 +105,7 @@ def main() -> None:
     _write_json(tmp_dir / "bug-effort-breakdown.json", result.bug_effort)
 
     if args.standup:
-        sys.stdout.write(standup_summary(result, issues, config))
+        sys.stdout.write(standup_summary(result, issues, config, jira_site_url=jira_site_url))
         if args.output:
             Path(args.output).parent.mkdir(parents=True, exist_ok=True)
             Path(args.output).write_text(result.markdown, encoding="utf-8")

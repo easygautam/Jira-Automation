@@ -46,7 +46,7 @@ Writes `reports/sprint-{date}.md`, prints a JSON summary (status counts, schedul
 
 `config.py` · `jira_model.py` · `teams.py` · `stages.py` · `sprint_window.py` · `normalize.py` · `schedule.py` · `delta.py` · `timeline.py` · `bugs.py` · `quality.py` · `pipeline.py` · `render/{markdown,sections,report}.py`. Tests in `scripts/tests/` (incl. `test_pipeline_golden.py`); fixtures in `scripts/tests/fixtures/`.
 
-Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment only; else **Other**). Stage/leave mapping: `sprintkit/stages.py` + `em-config.yaml` `timeline.*`. Details: `jira-domain` skill.
+Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment only; else **Other**). Stage/leave mapping: `sprintkit/stages.py` + `em-config.yaml` `timeline.*` (per-platform **Tech Solutioning** + **QA Test Planning** rows; QA requires platform in segment 2). Details: `jira-domain` skill.
 
 **Sprint window rule:** reports cover the complete active sprint (sprint start → end) across all statuses (closed/deferred included); each section applies its own status condition. Calendar Start/End columns are deferred (no Start/End columns in member/stage tables).
 
