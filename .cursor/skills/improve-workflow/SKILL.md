@@ -22,7 +22,8 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`sprint-rep
 | Team / summary prefixes | `sprintkit/teams.py`, `sprintkit/stages.py`, `jira-domain`, `delivery-flow`, `WORKFLOW.md`, tests |
 | Delivery phases / deps | `delivery-flow`, `sprintkit/schedule.py`, `sprintkit/stages.py`, `sprint-report` |
 | Report format | `sprint-report`, `sprintkit/render/*`, tests |
-| New option / command | `sprint-report.md` command + `em-workflow.mdc` + `WORKFLOW.md` + `sprint_report.py` |
+| New option / command | matching command + skill + `em-workflow.mdc` + `WORKFLOW.md` + entry script |
+| Epic estimation / stage dates | `epic-estimation` skill, `stage_dates.py`, `epic_pipeline.py`, `delivery-flow`, tests |
 | Jira field mapping | `em-config.yaml`, `jira-domain`, `sprintkit/normalize.py`, `sprintkit/sprint_window.py` |
 | Sprint window / epic rollup | `sprintkit/sprint_window.py`, `sprintkit/render/sections.py`, `sprint-report` |
 | Timeline / bug sections | `sprintkit/timeline.py`, `sprintkit/bugs.py`, `sprintkit/render/sections.py`, `sprint-report` |
@@ -61,6 +62,7 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`sprint-rep
 
 ## Changelog
 
+- 2026-06-23 — **`/epic-estimation` command:** epic-scoped fetch (no sprint filter), `stage_dates.py` + `epic_pipeline.py` + `epic_estimation.py`; stage Start/End from Jira Start dates + calc-days; Canvas display only (no `reports/` file); `fields.startDate`, `epicEstimation` JQL in config; tests `test_stage_dates.py`, `test_epic_pipeline.py`; skills/commands/WORKFLOW updated.
 - 2026-06-05 — **Other = unmapped segments only:** `DEFAULT_SIDE_DISPLAY` + `resolve_side_display_map()` in `config.py`; `load_config()` merges built-in defaults when PyYAML absent (warns, does not block); `member_side_for_classification()` routes unmapped → Other, work → Backend/QA/Web/Mobile; executive-summary **Warnings** for config/consistency; tests in `test_config.py`; removed dead `stageMapping` / `leaveMappingRules` from em-config.
 - 2026-06-05 — **Jira links always clickable:** `resolve_jira_site_url` derives site from issue payloads when config/CLI absent; `linkify_bare_issue_keys` safety-net on report and standup output.
 - 2026-06-05 — **Prefix-only stage mapping:** pipe-segment rules in `stages.py` replace keyword `stageMapping` / `_qa_scoped_release_stage`; `{Web|App} | UAT | …` → UAT + **Product + Design** Teams plan row; `QA | {Web|App} | Pre-Prod|Prod testing|Final Testing | …` → Pre-Prod testing; `QA | BE | Final Testing | …` → Prod final testing; `QA | {Platform} | UAT …` → Stage testing; Ready for release stage removed; fixes VP-19936 false UAT; docs + tests updated.

@@ -19,7 +19,7 @@ from sprintkit.stages import (  # noqa: E402
     TEAM_PRODUCT_DESIGN,
     classify_issue,
 )
-from sprintkit.timeline import build_timeline_breakdown, calc_days  # noqa: E402
+from sprintkit.timeline import build_timeline_breakdown, calc_days, format_calc_days  # noqa: E402
 
 
 def _issue(
@@ -139,11 +139,28 @@ def _stage_row(epic_row: dict, platform: str, stage: str) -> dict:
 
 
 class TestCalcDays(unittest.TestCase):
-    def test_six_hour_day(self):
-        self.assertEqual(calc_days(12, 6, 0, 2, 6), 2)
+    def test_six_hour_day_decimal(self):
+        self.assertEqual(calc_days(12, 6, 0, 2, 6), 1.5)
+
+    def test_three_hours_half_day(self):
+        self.assertEqual(calc_days(3, 0, 0, 1, 6), 0.5)
+
+    def test_development_with_leave(self):
+        self.assertEqual(calc_days(14, 12, 0, 1, 6), 4.33)
 
     def test_no_resources(self):
         self.assertIsNone(calc_days(10, 0, 0, 0, 6))
+
+
+class TestFormatCalcDays(unittest.TestCase):
+    def test_half_day(self):
+        self.assertEqual(format_calc_days(0.5), "0.5")
+
+    def test_decimal_trim(self):
+        self.assertEqual(format_calc_days(4.33), "4.33")
+
+    def test_whole_day(self):
+        self.assertEqual(format_calc_days(2.0), "2")
 
 
 class TestClassifyIssue(unittest.TestCase):
@@ -275,6 +292,8 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         self.assertEqual(be_row["effortsHours"], 8.0)
         bug_row = _stage_row(epic_row, "backend", "Bug fixes")
         self.assertEqual(bug_row["effortsHours"], 0.8)
+        self.assertEqual(bug_row["calculatedDays"], 0.13)
+        self.assertEqual(bug_row["resources"], 1.0)
         self.assertEqual(bug_row["source"], "synthetic")
 
         self.assertTrue(epic_row["executionStages"]["backend"]["hasWork"])

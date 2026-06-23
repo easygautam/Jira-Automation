@@ -83,3 +83,15 @@ Per-epic **Execution stages** tables are **per platform** (`timeline.executionSt
 - Pipe-prefix dev tasks → Development; buffers in `timeline.effortBuffers`
 
 **Team on tasks:** first `|` prefix via `scripts/sprintkit/teams.py` + stage mapping in `scripts/sprintkit/stages.py` (see `jira-domain`). Timeline effort counts **Task/Sub-task** only; **Bug** effort is a separate report section (worklog). Timeline does not bucket Bug issue types.
+
+## Epic estimation stage dates (`/epic-estimation`)
+
+Computed in `scripts/sprintkit/stage_dates.py` after timeline effort aggregation. Displayed in a Cursor Canvas (no sprint report file).
+
+| Stage | Start | End |
+|-------|-------|-----|
+| Tech Solutioning | Earliest Jira **Start date** among stage tasks; none → `—` | `add_business_days(start, calculatedDays)` (6h calc days) |
+| Development | Earliest Jira Start among dev tasks; Web/Mobile ≥ next workday after BE Development end | same |
+| Other stages | `next_workday(prior_stage_end)` when stage has tasks or effort; **no tasks and no effort → `—`** | same |
+
+Epic rollup: **deliveryStart** = earliest resolved stage start; **goLive** = Go live date stage end (or latest stage end). Working days: `scheduling.workingDayInts` (Mon–Fri).

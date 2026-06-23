@@ -35,12 +35,26 @@ parent = STORY-KEY
 project = {projectKey} AND sprint in openSprints() AND timeoriginalestimate is EMPTY AND assignee is not EMPTY AND issuetype in (Task, Sub-task)
 ```
 
-## MCP fetch
+## Epic scope JQL (`/epic-estimation`, substitute `{projectKey}`, `{epicKey}`)
+
+Two-pass fetch (no sprint filter):
+
+```jql
+# Pass 1 — epicEstimation.epicScopeJql
+project = {projectKey} AND (key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey})
+
+# Pass 2 — epicEstimation.taskScopeJql ({parentKeys} = story keys from pass 1)
+project = {projectKey} AND parent in ({parentKeys})
+```
+
+Write merged issues to `scripts/.tmp/epic-{epicKey}-issues.json`. Include `fields.startDate` (`customfield_10015` by default) and `duedate` in MCP field list.
+
+## MCP fetch (sprint)
 
 1. `getAccessibleAtlassianResources` if `cloudId` empty
 2. Discover Sprint field via `getJiraIssueTypeMetaWithFields` if needed → `fields.sprint` in config
 3. `searchJiraIssuesUsingJql` paginated (`maxResults=100`, `nextPageToken`)
-4. Fields: `summary, status, assignee, priority, issuetype, parent, timeoriginalestimate, timespent, created, updated, resolutiondate, labels, components, {fields.sprint}, {fields.rank}` (see `fields` in config)
+4. Fields: `summary, status, assignee, priority, issuetype, parent, timeoriginalestimate, timespent, created, updated, resolutiondate, labels, components, duedate, {fields.sprint}, {fields.rank}, {fields.startDate}` (see `fields` in config)
 5. Write `scripts/.tmp/issues.json`; the pipeline derives the active sprint window (`scripts/sprintkit/sprint_window.py`) — do not infer sprint dates
 
 ## Leave tasks (timeline)

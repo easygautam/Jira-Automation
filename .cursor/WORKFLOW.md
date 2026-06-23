@@ -1,8 +1,8 @@
 # EM workflow manifest
 
-Canonical inventory for agents. **Runbook:** `.cursor/skills/sprint-report/SKILL.md`. **Agent:** `.cursor/agents/sprint-analyst.md`.
+Canonical inventory for agents. **Runbooks:** `.cursor/skills/sprint-report/SKILL.md` · `.cursor/skills/epic-estimation/SKILL.md`. **Agent:** `.cursor/agents/sprint-analyst.md`.
 
-One agent (`sprint-analyst`) and one command (`/sprint-report`) drive everything. The agent fetches Jira issues; a single pipeline (`scripts/sprint_report.py` → `scripts/sprintkit/`) maps and calculates everything and renders the report.
+One agent (`sprint-analyst`) drives two commands. **Sprint report** fetches the active sprint and saves `reports/sprint-{date}.md`. **Epic estimation** fetches one Epic (no sprint filter), computes stage Start/End dates, and displays a **Cursor Canvas** beside chat — **never** writes under `reports/`.
 
 ## Five-step process → pipeline
 
@@ -20,7 +20,7 @@ PLAN → FETCH (Load) → RUN (map + calculate + render) → REPORT
 
 Scheduling (`normalize.py` + `schedule.py`, 8h/day), bug effort (`bugs.py`), data-quality flags (`quality.py`), and rendering (`render/`) are wired together by `sprintkit/pipeline.py` and exposed through `scripts/sprint_report.py`.
 
-## Single command
+## Single command — sprint report
 
 **Prerequisites:** `pip install -r requirements.txt` is recommended so `em-config.yaml` loads fully (Jira `cloudId`, custom fields). Without PyYAML the pipeline uses built-in defaults from `sprintkit/config.py` — team bucketing (Backend/QA/Web/Mobile) still works; a warning appears in the report Executive summary.
 
@@ -44,9 +44,29 @@ Writes `reports/sprint-{date}.md`, prints a JSON summary (status counts, schedul
 | `bug-effort-breakdown.json` | `bugs.py` (worklog) |
 | `prior-schedule.json` | `--recalc` snapshot of the previous `schedule.json` |
 
+## Epic estimation command
+
+No sprint window. Requires `--epic {epicKey}`. **Stdout JSON only** — agent embeds `canvas` in a `.canvas.tsx` file beside chat. No `--output`, no `reports/` file.
+
+```bash
+python scripts/epic_estimation.py \
+  --epic {epicKey} \
+  --issues scripts/.tmp/epic-{epicKey}-issues.json \
+  --config .cursor/config/em-config.yaml \
+  --project {projectKey}
+```
+
+| Module | Role |
+|--------|------|
+| `sprintkit/epic_pipeline.py` | filter epic → timeline → stage dates → display payload |
+| `sprintkit/stage_dates.py` | per-platform stage Start/End from Jira Start + calc days |
+| `sprintkit/render/epic_sections.py` | markdown + canvas JSON builder |
+
+Fetch: two-pass JQL (`epicEstimation.epicScopeJql` + `taskScopeJql` in config). Stage date rules: `delivery-flow` skill.
+
 ## Package (`scripts/sprintkit/`)
 
-`config.py` · `jira_model.py` · `teams.py` · `stages.py` · `sprint_window.py` · `normalize.py` · `schedule.py` · `delta.py` · `timeline.py` · `bugs.py` · `quality.py` · `pipeline.py` · `render/{markdown,sections,report}.py`. Tests in `scripts/tests/` (incl. `test_pipeline_golden.py`); fixtures in `scripts/tests/fixtures/`.
+`config.py` · `jira_model.py` · `teams.py` · `stages.py` · `sprint_window.py` · `normalize.py` · `schedule.py` · `delta.py` · `timeline.py` · `stage_dates.py` · `bugs.py` · `quality.py` · `pipeline.py` · `epic_pipeline.py` · `render/{markdown,sections,report,epic_sections}.py`. Tests in `scripts/tests/` (incl. `test_pipeline_golden.py`, `test_stage_dates.py`, `test_epic_pipeline.py`); fixtures in `scripts/tests/fixtures/`.
 
 Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment only; else **Other**). **Teams plan Other** = segment mapping failed only (`member_side_for_classification` in `timeline.py`). Stage/leave mapping: `sprintkit/stages.py` — **pipe-segment only** (no keyword substring rules); per-platform **Tech Solutioning** + **QA Test Planning** rows; `{Web|App} | UAT | …` → Product + Design team; QA requires platform in segment 2. Side labels: `resolve_side_display_map()` in `config.py`. Details: `jira-domain` skill.
 
@@ -56,10 +76,10 @@ Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (firs
 
 - Jira title/estimate guide: [`docs/JIRA-BEST-PRACTICES.md`](../docs/JIRA-BEST-PRACTICES.md)
 - Config: `.cursor/config/em-config.yaml`
-- Commands: `sprint-report` (recalculate + standup are options), `improve-workflow` → matching skill under `.cursor/skills/`
+- Commands: `sprint-report` (recalculate + standup are options), `epic-estimation` (canvas only), `improve-workflow` → matching skill under `.cursor/skills/`
 - Rules: `em-workflow.mdc`, `schedule-engine.mdc`, `jira-read-only.mdc`
 - Agent: `.cursor/agents/sprint-analyst.md`
-- Skills: `sprint-report` (runbook), `jira-domain`, `delivery-flow`, `improve-workflow`
+- Skills: `sprint-report` (runbook), `epic-estimation`, `jira-domain`, `delivery-flow`, `improve-workflow`
 
 ## Six deliverables (report order)
 

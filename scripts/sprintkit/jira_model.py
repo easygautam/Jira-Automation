@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from sprintkit.config import (
@@ -77,6 +78,21 @@ def time_spent_seconds(issue: dict[str, Any], config: dict[str, Any] | None = No
     return int(get_field(issue, ts_field) or 0)
 
 
+def jira_start_date(
+    issue: dict[str, Any], config: dict[str, Any] | None = None
+) -> date | None:
+    """Parse Jira Start date field (ISO date string) or return None."""
+    fields_cfg = (config or {}).get("fields") or {}
+    field_id = fields_cfg.get("startDate", "customfield_10015")
+    raw = get_field(issue, field_id)
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(str(raw)[:10])
+    except (ValueError, TypeError):
+        return None
+
+
 def effective_estimate_seconds(
     issue: dict[str, Any], config: dict[str, Any] | None = None
 ) -> int:
@@ -145,6 +161,23 @@ def resolve_epic_key(
         return issue.get("key")
     epic = resolve_epic(issue, index)
     return epic.get("key") if epic else None
+
+
+def filter_issues_for_epic(
+    issues: list[dict[str, Any]], epic_key: str
+) -> list[dict[str, Any]]:
+    """Return epic issue and all descendants linked to the epic key."""
+    index = build_index(issues)
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for issue in issues:
+        key = issue.get("key")
+        if not key or key in seen:
+            continue
+        if key == epic_key or resolve_epic_key(issue, index) == epic_key:
+            out.append(issue)
+            seen.add(key)
+    return out
 
 
 def jira_rank(issue: dict[str, Any] | None, config: dict[str, Any] | None = None) -> str:

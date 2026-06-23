@@ -9,20 +9,28 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
 
 1. Load `.cursor/config/em-config.yaml` before any Jira fetch
 2. Resolve `cloudId` via Atlassian MCP `getAccessibleAtlassianResources` if empty
-3. Drive everything through **one agent + one command**:
-   - Agent: `.cursor/agents/sprint-analyst.md`
+3. Drive everything through **one agent** (`sprint-analyst`) and these commands:
    - `/sprint-report` → `.cursor/skills/sprint-report/SKILL.md`
    - Recalculate (priority/scope change): `/sprint-report` with `--recalc` (adds a Schedule Delta)
    - Daily standup (chat only): `/sprint-report` with `--standup`
+   - `/epic-estimation` → `.cursor/skills/epic-estimation/SKILL.md` (Canvas only — **no report file**)
    - `/improve-workflow` → `.cursor/skills/improve-workflow/SKILL.md`
-4. One command runs the whole pipeline and saves `reports/sprint-{YYYY-MM-DD}.md`:
+4. Sprint report — one command saves `reports/sprint-{YYYY-MM-DD}.md`:
 
    ```bash
    python scripts/sprint_report.py --issues scripts/.tmp/issues.json \
      --config .cursor/config/em-config.yaml --project {projectKey}
    ```
 
-5. Pipeline and file inventory: `.cursor/WORKFLOW.md`
+5. Epic estimation — stdout JSON + Cursor Canvas (never writes under `reports/`):
+
+   ```bash
+   python scripts/epic_estimation.py --epic {epicKey} \
+     --issues scripts/.tmp/epic-{epicKey}-issues.json \
+     --config .cursor/config/em-config.yaml --project {projectKey}
+   ```
+
+6. Pipeline and file inventory: `.cursor/WORKFLOW.md`
 
 ## Five-step process
 
@@ -33,4 +41,5 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
 - sprint report, on track, delayed, at risk, blocked
 - recalculate schedule, priority change, re-prioritize
 - daily standup, scrum, blockers, talking points
+- epic estimation, epic effort, epic timeline, stage dates, go-live estimate
 - improve workflow, update EM automation

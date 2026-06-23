@@ -18,6 +18,11 @@ fields:
   timeSpent: timespent           # Bug effort fallback when Original Estimate is empty
   sprint: customfield_10020      # Jira Cloud default; overwritten after auto-discovery
   rank: customfield_10019        # Jira Rank (LexoRank); drag-and-drop backlog order
+  startDate: customfield_10015   # Jira Cloud Start date; auto-discovered if wrong
+
+epicEstimation:
+  epicScopeJql: 'project = {projectKey} AND (key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey})'
+  taskScopeJql: 'project = {projectKey} AND parent in ({parentKeys})'
 
 scheduling:
   hoursPerDay: 8
@@ -67,6 +72,11 @@ reporting:
   outputDir: reports
   filenamePattern: sprint-{date}.md
   prdTitleSuffix: PRD   # Title suffix for PRD epics (display only; sort uses Jira Rank)
+
+slack:
+  channel: gautam-personal-agent
+  botTokenEnv: SLACK_BOT_TOKEN
+  # channelId: C0123456789   # optional — skip name lookup
 
 # Data quality: bug time flags use status lists below (whitespace/case normalized)
 dataQuality:

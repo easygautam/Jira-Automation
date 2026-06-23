@@ -106,13 +106,24 @@ def calc_days(
     unplanned: float,
     resources: float,
     hours_per_day: float,
-) -> int | None:
+) -> float | None:
+    """Person-days as a decimal: total hours / (resources × hours per day)."""
     if resources <= 0:
         return None
     total = efforts + planned_leave + unplanned
     if total <= 0:
         return None
-    return math.ceil(total / (resources * hours_per_day))
+    return round(total / (resources * hours_per_day), 2)
+
+
+def format_calc_days(value: float | int | None) -> str:
+    """Render calc days for tables (e.g. 0.5, 4.33, 2)."""
+    if value is None:
+        return "—"
+    rounded = round(float(value), 2)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    return f"{rounded:.2f}".rstrip("0").rstrip(".")
 
 
 def bump_member(
@@ -227,7 +238,11 @@ def _stage_to_row(
     bucket: dict[str, Any],
     hours_per_day: float,
 ) -> dict[str, Any]:
-    resources = float(len(bucket["resources"])) if bucket["resources"] else 0.0
+    resource_count = len(bucket["resources"])
+    resources = float(resource_count) if resource_count else 0.0
+    # Synthetic buffers (e.g. Bug fixes) have effort but no assignees — assume 1 resource.
+    if resources <= 0 and bucket["effortsHours"] > 0:
+        resources = 1.0
     calc = calc_days(
         bucket["effortsHours"],
         bucket["plannedLeaveHours"],

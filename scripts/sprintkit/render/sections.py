@@ -27,7 +27,7 @@ from sprintkit.render.markdown import (
 )
 from sprintkit.config import resolve_side_display_map
 from sprintkit.teams import team_from_issue
-from sprintkit.timeline import side_display
+from sprintkit.timeline import side_display, format_calc_days
 
 STATUS_RANK = {"blocked": 0, "delayed": 1, "at_risk": 2, "on_track": 3, "tbd": 4}
 SCHEDULE_TEAM_ORDER = ("Backend", "Web", "Mobile", "QA", "Other")
@@ -252,7 +252,7 @@ def render_timeline_sections(
         "**Effort** includes **Task** and **Sub-task** issue types only (bugs excluded).  ",
         "Bug effort is in **Bug fix effort** below (same file).",
         "",
-        "**Calc days** = ceil((Efforts + Leave) / (Resources × 6h)).",
+        "**Calc days** = (Efforts + Leave) / (Resources × 6h), shown as decimal person-days.",
         "",
     ]
 
@@ -307,8 +307,7 @@ def render_timeline_sections(
                 "-----------|--------|--------------|"
             )
             for m in members:
-                calc = m.get("calculatedDays")
-                calc_s = str(calc) if calc is not None else "—"
+                calc_s = format_calc_days(m.get("calculatedDays"))
                 tasks_s = escape_md_cell(", ".join(m.get("tasks") or [])[:80]) or "—"
                 issues_s = jira_issue_keys_linked(jira_site_url, m.get("issueKeys"))
                 lines.append(
@@ -326,8 +325,7 @@ def render_timeline_sections(
             lines.append(stage_header)
             lines.append(stage_sep)
             for row in stage_rows:
-                calc = row.get("calculatedDays")
-                calc_s = str(calc) if calc is not None else "—"
+                calc_s = format_calc_days(row.get("calculatedDays"))
                 src = row.get("source")
                 stage_label = row.get("stage", "")
                 if src == "synthetic":
