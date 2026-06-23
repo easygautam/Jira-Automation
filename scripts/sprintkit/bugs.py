@@ -13,6 +13,7 @@ from sprintkit.jira_model import (
     sort_epic_keys,
     time_spent_seconds,
 )
+from sprintkit.config import resolve_side_display_map
 from sprintkit.teams import team_from_issue
 from sprintkit.timeline import side_display
 
@@ -39,7 +40,7 @@ def build_bug_effort_breakdown(
     config: dict[str, Any],
 ) -> list[dict[str, Any]]:
     teams_cfg = config.get("teams") or {}
-    side_display_map = (config.get("timeline") or {}).get("sideDisplay") or {}
+    side_display_map = resolve_side_display_map(config)
 
     index = {i["key"]: i for i in issues if i.get("key")}
     epic_keys = collect_sprint_epic_keys(issues, schedule, config)

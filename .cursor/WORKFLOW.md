@@ -22,6 +22,8 @@ Scheduling (`normalize.py` + `schedule.py`, 8h/day), bug effort (`bugs.py`), dat
 
 ## Single command
 
+**Prerequisites:** `pip install -r requirements.txt` is recommended so `em-config.yaml` loads fully (Jira `cloudId`, custom fields). Without PyYAML the pipeline uses built-in defaults from `sprintkit/config.py` — team bucketing (Backend/QA/Web/Mobile) still works; a warning appears in the report Executive summary.
+
 ```bash
 python scripts/sprint_report.py \
   --issues scripts/.tmp/issues.json \
@@ -46,7 +48,7 @@ Writes `reports/sprint-{date}.md`, prints a JSON summary (status counts, schedul
 
 `config.py` · `jira_model.py` · `teams.py` · `stages.py` · `sprint_window.py` · `normalize.py` · `schedule.py` · `delta.py` · `timeline.py` · `bugs.py` · `quality.py` · `pipeline.py` · `render/{markdown,sections,report}.py`. Tests in `scripts/tests/` (incl. `test_pipeline_golden.py`); fixtures in `scripts/tests/fixtures/`.
 
-Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment only; else **Other**). Stage/leave mapping: `sprintkit/stages.py` — **pipe-segment only** (no keyword substring rules); per-platform **Tech Solutioning** + **QA Test Planning** rows; `{Web|App} | UAT | …` → Product + Design team; QA requires platform in segment 2. Details: `jira-domain` skill.
+Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment only; else **Other**). **Teams plan Other** = segment mapping failed only (`member_side_for_classification` in `timeline.py`). Stage/leave mapping: `sprintkit/stages.py` — **pipe-segment only** (no keyword substring rules); per-platform **Tech Solutioning** + **QA Test Planning** rows; `{Web|App} | UAT | …` → Product + Design team; QA requires platform in segment 2. Side labels: `resolve_side_display_map()` in `config.py`. Details: `jira-domain` skill.
 
 **Sprint window rule:** reports cover the complete active sprint (sprint start → end) across all statuses (closed/deferred included); each section applies its own status condition. Calendar Start/End columns are deferred (no Start/End columns in member/stage tables).
 

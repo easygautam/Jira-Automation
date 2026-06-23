@@ -142,8 +142,4 @@ timeline:
       - Pre-Prod testing
       - UAT
       - Go live date
-  leaveMappingRules:
-    - { keywords: ["leave | planned"], leaveType: planned }
-    - { keywords: ["leave | unplanned"], leaveType: unplanned }
   # Stage mapping is pipe-segment based in scripts/sprintkit/stages.py (not keyword rules).
-  stageMapping: []

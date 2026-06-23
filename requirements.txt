@@ -1,3 +1,2 @@
-# Stdlib only for schedule engine and tests.
-# Optional: PyYAML for jira_normalize.py config loading (falls back to defaults if absent).
+# PyYAML recommended for editing em-config.yaml; pipeline uses built-in defaults without it.
 PyYAML>=6.0

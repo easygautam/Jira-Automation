@@ -21,7 +21,8 @@ from sprintkit.render.markdown import (
 from sprintkit.render.report import render_report
 from sprintkit.schedule import compute_schedule
 from sprintkit.sprint_window import extract_active_sprint
-from sprintkit.timeline import build_timeline_breakdown
+from sprintkit.config import config_warnings
+from sprintkit.timeline import build_timeline_breakdown, check_timeline_team_consistency
 
 
 @dataclass
@@ -33,6 +34,7 @@ class PipelineResult:
     timeline: list[dict[str, Any]]
     bug_effort: list[dict[str, Any]]
     status_counts: dict[str, int] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 def resolve_sprint_meta(
@@ -101,6 +103,9 @@ def run_pipeline(
     timeline = build_timeline_breakdown(issues, schedule, config)
     bug_effort = build_bug_effort_breakdown(issues, schedule, config)
 
+    report_warnings = config_warnings(config)
+    report_warnings.extend(check_timeline_team_consistency(timeline))
+
     markdown = render_report(
         issues,
         schedule,
@@ -113,6 +118,7 @@ def run_pipeline(
         bug_effort=bug_effort,
         config=config,
         prior_schedule=prior_schedule,
+        warnings=report_warnings,
     )
 
     status_counts: dict[str, int] = {}
@@ -128,6 +134,7 @@ def run_pipeline(
         timeline=timeline,
         bug_effort=bug_effort,
         status_counts=status_counts,
+        warnings=report_warnings,
     )
 
 

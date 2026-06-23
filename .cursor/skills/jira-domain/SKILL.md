@@ -49,4 +49,16 @@ Leave tasks: summary starts with `Leave |` (see `timeline.leaveTaskPrefixes`). `
 
 ## Team from summary
 
-First `|` segment only → `scripts/sprintkit/teams.py` + `teamPrefixMapping` in config. Unmatched or no pipe → **Other**. QA on `QA | APP | …` is QA, not Mobile. Stage mapping is **pipe-segment only** in `scripts/sprintkit/stages.py` (no keyword substring rules): `{BE|Web|App} | Assessment` → **Tech Solutioning**; `QA | {App|Web|BE} | Assessment` → **QA Test Planning**; `QA | {Platform} | Automation` → Stage testing; `{Web|App} | UAT | …` → **UAT** (Teams plan: **Product + Design**); `QA | {Web|App} | Pre-Prod|Prod testing|Final Testing | …` → **Pre-Prod testing**; `QA | BE | Final Testing | …` → **Prod final testing**; `BE | Prod release |` / `BE | Prod final testing |` → backend release rows; pipe-prefix dev tasks → **Development**. QA without platform segment → unmapped.
+First `|` segment only → `scripts/sprintkit/teams.py` + `teamPrefixMapping` in config (built-in defaults in `sprintkit/config.py` when YAML is unavailable). Unmatched or no pipe → **Other**. QA on `QA | APP | …` is QA, not Mobile. Stage mapping is **pipe-segment only** in `scripts/sprintkit/stages.py` (no keyword substring rules): `{BE|Web|App} | Assessment` → **Tech Solutioning**; `QA | {App|Web|BE} | Assessment` → **QA Test Planning**; `QA | {Platform} | Automation` → Stage testing; `{Web|App} | UAT | …` → **UAT** (Teams plan: **Product + Design**); `QA | {Web|App} | Pre-Prod|Prod testing|Final Testing | …` → **Pre-Prod testing**; `QA | BE | Final Testing | …` → **Prod final testing**; `BE | Prod release |` / `BE | Prod final testing |` → backend release rows; pipe-prefix dev tasks → **Development**. QA without platform segment → unmapped.
+
+## Teams plan — when **Other** appears
+
+**Other** in the Teams plan member breakdown means **segment mapping failed** — not a catch-all for Backend/QA work.
+
+| Goes to Backend / Web / Mobile / QA / Product + Design | Goes to **Other** only |
+|--------------------------------------------------------|-------------------------|
+| `BE \| …`, `WEB \| …`, `APP \| …` | No `\|` prefix, or first segment not recognized |
+| `QA \| BE \| …`, `QA \| Web \| …`, `QA \| App \| …` | `QA \| …` without platform in segment 2 |
+| `{Web\|App} \| UAT \| …` | Legacy `QA \| Assessment`; titles like `Stage-APP \| …` |
+
+Team row labels come from `resolve_side_display_map()` (`DEFAULT_SIDE_DISPLAY` + optional `timeline.sideDisplay` in config). Correctly prefixed tasks must **never** land under Other because of missing PyYAML or empty config.

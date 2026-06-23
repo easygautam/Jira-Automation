@@ -45,7 +45,6 @@ CONFIG = {
             "frontend": ["Development", "Stage testing"],
             "mobile": ["Development", "Stage testing"],
         },
-        "stageMapping": [],
     },
 }
 

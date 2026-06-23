@@ -61,6 +61,7 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`sprint-rep
 
 ## Changelog
 
+- 2026-06-05 — **Other = unmapped segments only:** `DEFAULT_SIDE_DISPLAY` + `resolve_side_display_map()` in `config.py`; `load_config()` merges built-in defaults when PyYAML absent (warns, does not block); `member_side_for_classification()` routes unmapped → Other, work → Backend/QA/Web/Mobile; executive-summary **Warnings** for config/consistency; tests in `test_config.py`; removed dead `stageMapping` / `leaveMappingRules` from em-config.
 - 2026-06-05 — **Jira links always clickable:** `resolve_jira_site_url` derives site from issue payloads when config/CLI absent; `linkify_bare_issue_keys` safety-net on report and standup output.
 - 2026-06-05 — **Prefix-only stage mapping:** pipe-segment rules in `stages.py` replace keyword `stageMapping` / `_qa_scoped_release_stage`; `{Web|App} | UAT | …` → UAT + **Product + Design** Teams plan row; `QA | {Web|App} | Pre-Prod|Prod testing|Final Testing | …` → Pre-Prod testing; `QA | BE | Final Testing | …` → Prod final testing; `QA | {Platform} | UAT …` → Stage testing; Ready for release stage removed; fixes VP-19936 false UAT; docs + tests updated.
 - 2026-06-05 — **Jira links everywhere:** standup summary uses browse links; member Issues column lists all linked keys (no 4-key cap); golden test asserts no bare `VP-*` keys in report tables/lists; sprint-report skill updated.

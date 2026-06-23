@@ -21,25 +21,83 @@ from sprintkit.jira_model import (
     resolve_epic_key,
     sort_epic_keys,
 )
+from sprintkit.config import DEFAULT_SIDE_DISPLAY, resolve_side_display_map
 from sprintkit.stages import (
     DEFAULT_EXECUTION_STAGES,
     PLATFORM_KEYS,
     PLATFORM_SIDE,
     STAGE_BUG_FIXES,
     STAGE_DEVELOPMENT,
+    STAGE_QA_TEST_PLANNING,
     STAGE_STAGE_FINAL_TESTING,
     STAGE_STAGE_TESTING,
     TEAM_PRODUCT_DESIGN,
     classify_issue,
 )
+from sprintkit.teams import TEAM_OTHER
 
 TEAM_PLAN_SIDES = ("Backend", "Web", "Mobile", "Product + Design", "QA", "Other")
 
+_WORK_MEMBER_STAGES = frozenset(
+    {"Development", "Tech Solutioning", STAGE_STAGE_TESTING, STAGE_QA_TEST_PLANNING}
+)
 
-def side_display(team: str, side_display_map: dict[str, str]) -> str:
-    if team in ("other", "unknown"):
-        return side_display_map.get("other") or side_display_map.get("unknown", "Other")
-    return side_display_map.get(team, side_display_map.get("other", "Other"))
+
+def side_display(team: str, side_display_map: dict[str, str] | None = None) -> str:
+    """Map internal team key to Teams plan row label; defaults never collapse to Other."""
+    merged = {**DEFAULT_SIDE_DISPLAY, **(side_display_map or {})}
+    if team in (TEAM_OTHER, "unknown"):
+        return merged.get("other") or merged.get("unknown", "Other")
+    return merged.get(team, merged.get("other", "Other"))
+
+
+def member_side_for_classification(
+    classification: dict[str, Any],
+    side_display_map: dict[str, str],
+) -> str:
+    """Teams plan row for a classified issue (Other only when segment mapping failed)."""
+    kind = classification.get("kind")
+    if kind == "unmapped":
+        return side_display(TEAM_OTHER, side_display_map)
+    if kind == "leave":
+        return side_display(classification.get("team") or TEAM_OTHER, side_display_map)
+    work_team = classification.get("team") or classification.get("platform")
+    if work_team == "qa":
+        return side_display("qa", side_display_map)
+    if work_team == TEAM_PRODUCT_DESIGN:
+        return side_display(TEAM_PRODUCT_DESIGN, side_display_map)
+    return side_display(work_team or TEAM_OTHER, side_display_map)
+
+
+def check_timeline_team_consistency(timeline: list[dict[str, Any]]) -> list[str]:
+    """Safety net: Backend/Web/Mobile stage effort with dev work under Other."""
+    warnings: list[str] = []
+    for epic in timeline:
+        epic_key = epic.get("epicKey", "")
+        other_members = (epic.get("membersBySide") or {}).get("Other") or []
+        if not other_members:
+            continue
+        dev_keys: set[str] = set()
+        for member in other_members:
+            tasks = member.get("tasks") or []
+            if tasks and not all(t == "(unmapped)" for t in tasks):
+                if any(t in _WORK_MEMBER_STAGES for t in tasks):
+                    dev_keys.update(member.get("issueKeys") or [])
+        if not dev_keys:
+            continue
+        for platform, side_label in PLATFORM_SIDE.items():
+            block = (epic.get("executionStages") or {}).get(platform) or {}
+            if not block.get("hasWork"):
+                continue
+            summary = (epic.get("teamSummary") or {}).get(side_label) or {}
+            if (summary.get("taskCount") or 0) > 0 and not (summary.get("members") or []):
+                warnings.append(
+                    f"{epic_key}: {side_label} execution stages have effort but "
+                    f"assignees with mapped dev/QA work appear under Other — "
+                    f"check config loading."
+                )
+                break
+    return warnings
 
 
 def calc_days(
@@ -224,7 +282,7 @@ def build_timeline_breakdown(
     timeline_cfg = config.get("timeline") or {}
     teams_cfg = config.get("teams") or {}
     hours_per_day = float(timeline_cfg.get("hoursPerDay", 6))
-    side_display_map = timeline_cfg.get("sideDisplay") or {}
+    side_display_map = resolve_side_display_map(config)
     execution_stages = timeline_cfg.get("executionStages") or DEFAULT_EXECUTION_STAGES
     buffers = timeline_cfg.get("effortBuffers") or {}
 
@@ -275,7 +333,7 @@ def build_timeline_breakdown(
             member = assignee_name(issue)
 
             if classification["kind"] == "leave":
-                side = side_display(classification["team"], side_display_map)
+                side = member_side_for_classification(classification, side_display_map)
                 leave_by_side[side][classification["leaveType"]] += est_h
                 planned = est_h if classification["leaveType"] == "planned" else 0.0
                 unplanned = est_h if classification["leaveType"] == "unplanned" else 0.0
@@ -291,7 +349,7 @@ def build_timeline_breakdown(
 
             if classification["kind"] == "unmapped":
                 if est_h > 0 or key in scheduled_keys:
-                    side = side_display(classification["team"], side_display_map)
+                    side = member_side_for_classification(classification, side_display_map)
                     bump_member(
                         member_stats,
                         side,
@@ -320,13 +378,7 @@ def build_timeline_breakdown(
                 bucket_map[stage_name] = _empty_stage_bucket()
 
             b = bucket_map[stage_name]
-            work_team = classification.get("team") or platform
-            if work_team == "qa":
-                member_side = side_display("qa", side_display_map)
-            elif work_team == TEAM_PRODUCT_DESIGN:
-                member_side = side_display(TEAM_PRODUCT_DESIGN, side_display_map)
-            else:
-                member_side = side_display(work_team, side_display_map)
+            member_side = member_side_for_classification(classification, side_display_map)
 
             b["effortsHours"] += est_h
             if b.get("source") != "synthetic":

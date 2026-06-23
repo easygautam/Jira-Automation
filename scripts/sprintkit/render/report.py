@@ -34,6 +34,7 @@ def render_report(
     bug_effort: list[dict[str, Any]] | None = None,
     config: dict[str, Any] | None = None,
     prior_schedule: dict[str, Any] | None = None,
+    warnings: list[str] | None = None,
 ) -> str:
     jira_site_url = resolve_jira_site_url(jira_site_url, config, issues)
 
@@ -88,7 +89,9 @@ def render_report(
     ]
 
     lines.extend(
-        render_executive_summary(status_counts, unscheduled, issue_by_key, config)
+        render_executive_summary(
+            status_counts, unscheduled, issue_by_key, config, warnings=warnings
+        )
     )
     lines.extend(
         render_delivery_items(

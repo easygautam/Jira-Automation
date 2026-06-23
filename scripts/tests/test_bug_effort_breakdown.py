@@ -62,7 +62,6 @@ CONFIG = {
             "frontend": ["Development"],
             "mobile": ["Development"],
         },
-        "stageMapping": [],
     },
 }
 

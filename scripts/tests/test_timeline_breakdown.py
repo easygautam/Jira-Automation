@@ -129,7 +129,6 @@ MINIMAL_CONFIG = {
                 "Go live date",
             ],
         },
-        "stageMapping": [],
     },
 }
 
@@ -375,6 +374,17 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
         for member in backend_members:
             self.assertNotIn("start", member)
             self.assertNotIn("end", member)
+        self.assertNotIn("Other", result[0]["membersBySide"])
+
+    def test_be_tasks_bucket_backend_with_empty_side_display(self):
+        epic = _epic("VP-310")
+        task = _issue("VP-311", "BE || work", 3600, parent_key="VP-310", assignee="Alice")
+        cfg = dict(MINIMAL_CONFIG)
+        cfg["timeline"] = dict(MINIMAL_CONFIG["timeline"])
+        cfg["timeline"]["sideDisplay"] = {}
+        epic_row = build_timeline_breakdown([epic, task], {"scheduled": []}, cfg)[0]
+        self.assertIn("Backend", epic_row["membersBySide"])
+        self.assertNotIn("Other", epic_row["membersBySide"])
 
     def test_qa_test_planning_per_platform_only(self):
         epic = _epic("VP-700")

@@ -25,6 +25,7 @@ from sprintkit.render.markdown import (
     jira_issue_keys_linked,
     jira_issue_link,
 )
+from sprintkit.config import resolve_side_display_map
 from sprintkit.teams import team_from_issue
 from sprintkit.timeline import side_display
 
@@ -112,7 +113,7 @@ def compute_epic_rollup(
 def member_team_label(issue: dict, config: dict[str, Any] | None) -> str:
     teams_cfg = (config or {}).get("teams") or {}
     team = team_from_issue(issue, teams_cfg, config)
-    side_map = (config or {}).get("timeline", {}).get("sideDisplay") or {}
+    side_map = resolve_side_display_map(config)
     return side_display(team, side_map)
 
 
@@ -134,6 +135,7 @@ def render_executive_summary(
     unscheduled: list[dict[str, Any]],
     issue_by_key: dict[str, dict],
     config: dict[str, Any] | None,
+    warnings: list[str] | None = None,
 ) -> list[str]:
     lines = [
         "## Executive summary",
@@ -176,6 +178,11 @@ def render_executive_summary(
             f"{status_counts.get('on_track', 0)} items on track; "
             f"{risk_n} need attention before sprint end."
         )
+    if warnings:
+        lines.append("")
+        lines.append("**Warnings**")
+        for note in warnings:
+            lines.append(f"- {note}")
     lines.append("")
     return lines
 

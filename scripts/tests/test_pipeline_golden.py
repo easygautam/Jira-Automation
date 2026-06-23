@@ -101,6 +101,12 @@ class TestPipelineGolden(unittest.TestCase):
         bare_bullet_key = re.search(r"^- VP-\d+:", self.md, re.MULTILINE)
         self.assertIsNone(bare_bullet_key, "found unlinked issue key in list")
 
+    def test_backend_member_breakdown_not_under_other(self):
+        self.assertIn("**Backend** — member breakdown", self.md)
+        self.assertIn("Alice Backend", self.md)
+        demo_section = self.md.split("### [VP-900]", 1)[-1].split("### ", 1)[0]
+        self.assertNotIn("**Other** — member breakdown", demo_section)
+
 
 if __name__ == "__main__":
     unittest.main()
