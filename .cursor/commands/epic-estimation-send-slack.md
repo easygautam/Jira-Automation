@@ -10,8 +10,7 @@ Requires **`SLACK_BOT_TOKEN`** — local: `.env.local` (copy from `.env.example`
 python scripts/epic_estimation_slack.py \
   --epic {epicKey} \
   --issues scripts/.tmp/epic-{epicKey}-issues.json \
-  --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --config .cursor/config/em-config.yaml
 ```
 
 Use `--dry-run` to preview Block Kit JSON without posting. Use `--check-slack` to verify credentials.

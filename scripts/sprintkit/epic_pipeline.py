@@ -33,7 +33,6 @@ def run_epic_estimation(
     config: dict[str, Any],
     epic_key: str,
     *,
-    project: str = "VP",
     jira_site_url: str | None = None,
 ) -> EpicEstimationResult:
     """Run effort mapping and stage date calculation for one epic."""
@@ -69,7 +68,6 @@ def run_epic_estimation(
         epic_row,
         quality,
         jira_site_url=site,
-        project=project,
     )
 
     return EpicEstimationResult(

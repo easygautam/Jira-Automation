@@ -16,19 +16,19 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
    - `/epic-estimation` → `.cursor/skills/epic-estimation/SKILL.md` (Canvas only — **no report file**)
    - `/epic-estimation-send-slack` → `.cursor/skills/epic-estimation-send-slack/SKILL.md` (Canvas + Slack Block Kit)
    - `/improve-workflow` → `.cursor/skills/improve-workflow/SKILL.md`
-4. Sprint report — one command saves `reports/sprint-{YYYY-MM-DD}.md`:
+4. Sprint report — one command saves `reports/sprint-{YYYY-MM-DD}.md` (`--project` optional when `jira.projectKey` is set):
 
    ```bash
    python scripts/sprint_report.py --issues scripts/.tmp/issues.json \
      --config .cursor/config/em-config.yaml --project {projectKey}
    ```
 
-5. Epic estimation — stdout JSON + Cursor Canvas (never writes under `reports/`):
+5. Epic estimation — stdout JSON + Cursor Canvas (never writes under `reports/`; no `--project`):
 
    ```bash
    python scripts/epic_estimation.py --epic {epicKey} \
      --issues scripts/.tmp/epic-{epicKey}-issues.json \
-     --config .cursor/config/em-config.yaml --project {projectKey}
+     --config .cursor/config/em-config.yaml
    ```
 
 6. Epic estimation → Slack — same pipeline + Canvas, then Block Kit post (`SLACK_BOT_TOKEN`):
@@ -36,7 +36,7 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
    ```bash
    python scripts/epic_estimation_slack.py --epic {epicKey} \
      --issues scripts/.tmp/epic-{epicKey}-issues.json \
-     --config .cursor/config/em-config.yaml --project {projectKey}
+     --config .cursor/config/em-config.yaml
    ```
 
 7. Pipeline and file inventory: `.cursor/WORKFLOW.md`

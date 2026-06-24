@@ -15,7 +15,9 @@ from sprintkit.config import (  # noqa: E402
     DEFAULT_SIDE_DISPLAY,
     default_config,
     load_config,
+    project_key_from_issue_key,
     pyyaml_available,
+    resolve_project_key,
     resolve_side_display_map,
 )
 from sprintkit.stages import STAGE_DEVELOPMENT  # noqa: E402
@@ -60,6 +62,32 @@ def _epic(key: str) -> dict:
             "status": {"name": "In Progress"},
         },
     }
+
+
+class TestProjectKeyResolution(unittest.TestCase):
+    def test_project_key_from_issue_key(self):
+        self.assertEqual(project_key_from_issue_key("VP-12345"), "VP")
+        self.assertEqual(project_key_from_issue_key("foot-99"), "FOOT")
+        self.assertIsNone(project_key_from_issue_key("INVALID"))
+        self.assertIsNone(project_key_from_issue_key(""))
+
+    def test_resolve_cli_overrides_config(self):
+        cfg = {"jira": {"projectKey": "VP"}}
+        self.assertEqual(resolve_project_key(cli="FOOT", config=cfg), "FOOT")
+
+    def test_resolve_from_epic_key(self):
+        self.assertEqual(
+            resolve_project_key(epic_key="ABC-12345", config={}),
+            "ABC",
+        )
+
+    def test_resolve_from_config(self):
+        cfg = {"jira": {"projectKey": "VP"}}
+        self.assertEqual(resolve_project_key(config=cfg), "VP")
+
+    def test_resolve_raises_when_missing(self):
+        with self.assertRaises(ValueError):
+            resolve_project_key(config={})
 
 
 class TestSideDisplay(unittest.TestCase):

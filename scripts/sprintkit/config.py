@@ -108,6 +108,35 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
     return result
 
 
+def project_key_from_issue_key(issue_key: str) -> str | None:
+    """Extract Jira project key prefix from an issue key (e.g. ABC-12345 → ABC)."""
+    if not issue_key or "-" not in issue_key:
+        return None
+    return issue_key.split("-", 1)[0].upper()
+
+
+def resolve_project_key(
+    *,
+    cli: str | None = None,
+    config: dict[str, Any] | None = None,
+    epic_key: str | None = None,
+) -> str:
+    """Resolve project key: CLI override → epic key prefix → config default."""
+    if cli:
+        return cli.upper()
+    if epic_key:
+        derived = project_key_from_issue_key(epic_key)
+        if derived:
+            return derived
+    cfg = ((config or {}).get("jira") or {}).get("projectKey")
+    if cfg:
+        return str(cfg).upper()
+    raise ValueError(
+        "Project key required: pass --project, set jira.projectKey in config, "
+        "or provide an epic key (e.g. ABC-12345)."
+    )
+
+
 def config_warnings(config: dict[str, Any] | None) -> list[str]:
     """Non-fatal setup notices for the executive summary."""
     warnings: list[str] = []

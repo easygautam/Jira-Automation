@@ -24,8 +24,8 @@ PLAN → FETCH → RUN → DISPLAY → SLACK
 Same as `.cursor/skills/epic-estimation/SKILL.md`:
 
 1. Read `.cursor/config/em-config.yaml`.
-2. Require **Epic key** from the user (e.g. `VP-12345`).
-3. Confirm `projectKey`; resolve `cloudId` via Atlassian MCP if empty.
+2. Require **Epic key** from the user (e.g. `ABC-12345`). Project is derived from the epic key — do not ask for project.
+3. Resolve `cloudId` via Atlassian MCP if empty.
 4. Confirm Slack credentials: local `.env.local` or Cursor Cloud Secrets (`SLACK_BOT_TOKEN`; optional `SLACK_CHANNEL_ID`).
 
 ### FETCH — epic issue tree (no sprint filter)
@@ -40,8 +40,7 @@ Same CLI as epic-estimation:
 python scripts/epic_estimation.py \
   --epic {epicKey} \
   --issues scripts/.tmp/epic-{epicKey}-issues.json \
-  --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --config .cursor/config/em-config.yaml
 ```
 
 Stdout JSON includes `canvas`, `markdown`, `timeline`, etc.
@@ -62,8 +61,7 @@ Post Block Kit message built from the `canvas` JSON:
 python scripts/epic_estimation_slack.py \
   --epic {epicKey} \
   --issues scripts/.tmp/epic-{epicKey}-issues.json \
-  --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --config .cursor/config/em-config.yaml
 ```
 
 - On success, stdout JSON includes `slack.posted`, `slack.permalink`, `slack.channel`.

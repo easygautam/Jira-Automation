@@ -136,8 +136,6 @@ class TestEpicPipeline(unittest.TestCase):
                 "VP-800",
                 "--issues",
                 str(fixture),
-                "--project",
-                "VP",
                 "--jira-site-url",
                 "https://example.atlassian.net",
             ],

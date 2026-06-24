@@ -26,10 +26,9 @@ def _write_json(path: Path, data) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Epic estimation (stdout JSON; no report file)")
-    parser.add_argument("--epic", required=True, help="Epic issue key (e.g. VP-12345)")
+    parser.add_argument("--epic", required=True, help="Epic issue key (e.g. ABC-12345)")
     parser.add_argument("--issues", default="scripts/.tmp/issues.json")
     parser.add_argument("--config", default=".cursor/config/em-config.yaml")
-    parser.add_argument("--project", default="VP")
     parser.add_argument("--jira-site-url", default=None)
     parser.add_argument(
         "--tmp-dir",
@@ -47,7 +46,6 @@ def main() -> None:
             issues,
             config,
             args.epic.upper(),
-            project=args.project,
             jira_site_url=jira_site_url,
         )
     except ValueError as exc:

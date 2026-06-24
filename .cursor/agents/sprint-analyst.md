@@ -28,23 +28,24 @@ Delivery items (Epics) · Teams plan · Member breakdown · Execution stages · 
 ## Run
 
 1. Load `.cursor/config/em-config.yaml`; resolve `cloudId` via Atlassian MCP if empty.
-2. Fetch all sprint issues (see `.cursor/skills/jira-domain/SKILL.md`) → write `scripts/.tmp/issues.json`.
-3. One command runs steps 2–5 and renders all six deliverables:
+2. For sprint report: resolve project key (user-stated → `--project` → `jira.projectKey` → ask user).
+3. Fetch all sprint issues (see `.cursor/skills/jira-domain/SKILL.md`) → write `scripts/.tmp/issues.json`.
+4. One command runs steps 2–5 and renders all six deliverables:
 
 ```bash
 python scripts/sprint_report.py \
   --issues scripts/.tmp/issues.json \
   --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --project {projectKey}   # optional when jira.projectKey is set in config
 ```
 
-4. Summarize on_track / at_risk / delayed / blocked in chat.
+5. Summarize on_track / at_risk / delayed / blocked in chat.
 
 **Options:** `--recalc` (snapshot the prior schedule and add a Schedule Delta), `--standup` (print a short standup summary in chat), `--output PATH`.
 
 ## Epic estimation (`/epic-estimation`)
 
-1. Require Epic key from the user.
+1. Require Epic key from the user (project derived from epic key — do not ask for project).
 2. Fetch epic issue tree (no sprint filter) → `scripts/.tmp/epic-{epicKey}-issues.json`.
 3. Run:
 
@@ -52,8 +53,7 @@ python scripts/sprint_report.py \
 python scripts/epic_estimation.py \
   --epic {epicKey} \
   --issues scripts/.tmp/epic-{epicKey}-issues.json \
-  --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --config .cursor/config/em-config.yaml
 ```
 
 4. Parse stdout JSON; embed `canvas` in `canvases/epic-{epicKey}.canvas.tsx` and open beside chat.
@@ -63,7 +63,7 @@ python scripts/epic_estimation.py \
 
 Same as `/epic-estimation`, then post Block Kit to Slack:
 
-1. Require Epic key from the user.
+1. Require Epic key from the user (project derived from epic key — do not ask for project).
 2. Fetch epic issue tree (no sprint filter) → `scripts/.tmp/epic-{epicKey}-issues.json`.
 3. Run pipeline + Canvas display (steps above).
 4. Post to Slack:
@@ -72,8 +72,7 @@ Same as `/epic-estimation`, then post Block Kit to Slack:
 python scripts/epic_estimation_slack.py \
   --epic {epicKey} \
   --issues scripts/.tmp/epic-{epicKey}-issues.json \
-  --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --config .cursor/config/em-config.yaml
 ```
 
 5. Brief chat summary including **Slack permalink**. Requires `SLACK_BOT_TOKEN`.

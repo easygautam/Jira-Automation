@@ -26,7 +26,7 @@ Epic (priority source) → Story → Task / Sub-task (estimate + assignee). Walk
 
 Task effective priority = Epic priority (`priorityOrder` in config). Flag missing estimates before scheduling.
 
-## JQL (substitute `{projectKey}`)
+## JQL — sprint report (substitute `{projectKey}`)
 
 ```jql
 project = {projectKey} AND sprint in openSprints()
@@ -35,16 +35,18 @@ parent = STORY-KEY
 project = {projectKey} AND sprint in openSprints() AND timeoriginalestimate is EMPTY AND assignee is not EMPTY AND issuetype in (Task, Sub-task)
 ```
 
-## Epic scope JQL (`/epic-estimation`, substitute `{projectKey}`, `{epicKey}`)
+Resolve `{projectKey}` from user-stated project → CLI `--project` → `jira.projectKey` in config.
 
-Two-pass fetch (no sprint filter):
+## Epic scope JQL (`/epic-estimation`, substitute `{epicKey}` only)
+
+Two-pass fetch (no sprint filter; no project filter — issue keys are site-wide unique):
 
 ```jql
 # Pass 1 — epicEstimation.epicScopeJql
-project = {projectKey} AND (key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey})
+key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey}
 
 # Pass 2 — epicEstimation.taskScopeJql ({parentKeys} = story keys from pass 1)
-project = {projectKey} AND parent in ({parentKeys})
+parent in ({parentKeys})
 ```
 
 Write merged issues to `scripts/.tmp/epic-{epicKey}-issues.json`. Include `fields.startDate` (`customfield_10015` by default) and `duedate` in MCP field list.

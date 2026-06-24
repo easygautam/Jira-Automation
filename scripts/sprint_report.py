@@ -26,7 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from sprintkit.config import load_config  # noqa: E402
+from sprintkit.config import load_config, resolve_project_key  # noqa: E402
 from sprintkit.pipeline import run_pipeline, standup_summary  # noqa: E402
 
 
@@ -46,7 +46,11 @@ def main() -> None:
     parser.add_argument("--config", default=".cursor/config/em-config.yaml")
     parser.add_argument("--output", default=None, help="Report path; default reports/sprint-{date}.md")
     parser.add_argument("--tmp-dir", default="scripts/.tmp", help="Where pipeline JSON snapshots are written")
-    parser.add_argument("--project", default="VP")
+    parser.add_argument(
+        "--project",
+        default=None,
+        help="Jira project key (default: jira.projectKey from config)",
+    )
     parser.add_argument("--sprint-label", default="Active Sprint")
     parser.add_argument("--jira-site-url", default=None, help="Override jira.siteUrl from config")
     parser.add_argument("--sprint-field", default=None, help="Override config fields.sprint")
@@ -81,10 +85,16 @@ def main() -> None:
         _write_json(tmp_dir / "prior-schedule.json", prior_schedule)
 
     try:
+        project = resolve_project_key(cli=args.project, config=config)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
+
+    try:
         result = run_pipeline(
             issues,
             config,
-            project=args.project,
+            project=project,
             sprint_label=args.sprint_label,
             sprint_start=args.sprint_start,
             sprint_end=args.sprint_end,
@@ -105,7 +115,9 @@ def main() -> None:
     _write_json(tmp_dir / "bug-effort-breakdown.json", result.bug_effort)
 
     if args.standup:
-        sys.stdout.write(standup_summary(result, issues, config, jira_site_url=jira_site_url))
+        sys.stdout.write(
+            standup_summary(result, issues, config, jira_site_url=jira_site_url, project=project)
+        )
         if args.output:
             Path(args.output).parent.mkdir(parents=True, exist_ok=True)
             Path(args.output).write_text(result.markdown, encoding="utf-8")

@@ -22,8 +22,8 @@ PLAN → FETCH → RUN → DISPLAY
 ### PLAN
 
 1. Read `.cursor/config/em-config.yaml`.
-2. Require **Epic key** from the user (e.g. `VP-12345`).
-3. Confirm `projectKey`; resolve `cloudId` via Atlassian MCP if empty.
+2. Require **Epic key** from the user (e.g. `ABC-12345`). Project is derived from the epic key — do not ask for project.
+3. Resolve `cloudId` via Atlassian MCP if empty.
 
 ### FETCH — epic issue tree (no sprint filter)
 
@@ -31,7 +31,7 @@ Follow `.cursor/skills/jira-domain/SKILL.md` epic-scope rules:
 
 1. `getAccessibleAtlassianResources` when `cloudId` empty.
 2. Discover Start date field if needed → `fields.startDate` in config.
-3. **Pass 1** — `searchJiraIssuesUsingJql` with `epicEstimation.epicScopeJql` (substitute `{projectKey}`, `{epicKey}`).
+3. **Pass 1** — `searchJiraIssuesUsingJql` with `epicEstimation.epicScopeJql` (substitute `{epicKey}` only).
 4. **Pass 2** — fetch tasks/sub-tasks: `epicEstimation.taskScopeJql` with `{parentKeys}` = story keys from pass 1.
 5. Fields: sprint fetch set **plus** `duedate`, `fields.startDate`.
 6. Merge + dedupe → `scripts/.tmp/epic-{epicKey}-issues.json`.
@@ -42,8 +42,7 @@ Follow `.cursor/skills/jira-domain/SKILL.md` epic-scope rules:
 python scripts/epic_estimation.py \
   --epic {epicKey} \
   --issues scripts/.tmp/epic-{epicKey}-issues.json \
-  --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --config .cursor/config/em-config.yaml
 ```
 
 Stdout is a single JSON object (`epicKey`, `deliveryStart`, `goLive`, `timeline`, `canvas`, `markdown`, `warnings`, `unmappedCount`). Optional `--tmp-dir scripts/.tmp` writes debug JSON only.

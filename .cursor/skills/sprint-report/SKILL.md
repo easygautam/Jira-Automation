@@ -21,8 +21,9 @@ PLAN → FETCH (Load) → RUN (map + calculate + render) → REPORT
 ### PLAN
 
 1. Read `.cursor/config/em-config.yaml`.
-2. Confirm `projectKey`; resolve `cloudId` via Atlassian MCP if empty.
-3. Pick mode: full report | `--recalc` (Schedule Delta) | `--standup` (chat only). If recalculating and the change is unknown, ask: priority / add / remove / reassignment.
+2. Resolve **project key** for sprint fetch: user-stated project in chat → `--project` CLI → `jira.projectKey` in config → ask the user if still empty.
+3. Resolve `cloudId` via Atlassian MCP if empty.
+4. Pick mode: full report | `--recalc` (Schedule Delta) | `--standup` (chat only). If recalculating and the change is unknown, ask: priority / add / remove / reassignment.
 
 ### FETCH — Step 1 (Load sprint items)
 
@@ -44,7 +45,7 @@ A single command maps each task to platform/team (Step 2), maps leave tasks (Ste
 python scripts/sprint_report.py \
   --issues scripts/.tmp/issues.json \
   --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --project {projectKey}   # optional when jira.projectKey is set in config
 ```
 
 The command writes `reports/sprint-{YYYY-MM-DD}.md` and prints a JSON summary (status counts, scheduled/unscheduled, sprint window). It also snapshots pipeline JSON under `scripts/.tmp/` (`sprint-meta`, `engine-input`, `schedule`, `timeline-breakdown`, `bug-effort-breakdown`) for debugging and recalculation continuity.

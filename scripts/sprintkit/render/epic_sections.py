@@ -233,9 +233,7 @@ def build_epic_display_payload(
     quality: dict[str, list[dict[str, str]]],
     *,
     jira_site_url: str | None,
-    project: str,
 ) -> dict[str, Any]:
-    del project  # reserved for future Jira link context
     markdown = build_epic_markdown(
         epic_key, prd_name, epic_row, jira_site_url=jira_site_url, quality=quality
     )

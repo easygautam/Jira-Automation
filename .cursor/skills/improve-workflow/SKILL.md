@@ -62,6 +62,7 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`sprint-rep
 
 ## Changelog
 
+- 2026-06-24 — **Multi-project support:** `resolve_project_key()` + `project_key_from_issue_key()` in `config.py`; sprint-report resolves project via user/CLI/config; epic commands derive project from epic key and drop `--project`; epic JQL no longer filters by project; removed VP hardcoded CLI defaults; docs/skills/WORKFLOW updated.
 - 2026-06-23 — **`/epic-estimation` command:** epic-scoped fetch (no sprint filter), `stage_dates.py` + `epic_pipeline.py` + `epic_estimation.py`; stage Start/End from Jira Start dates + calc-days; Canvas display only (no `reports/` file); `fields.startDate`, `epicEstimation` JQL in config; tests `test_stage_dates.py`, `test_epic_pipeline.py`; skills/commands/WORKFLOW updated.
 - 2026-06-05 — **Other = unmapped segments only:** `DEFAULT_SIDE_DISPLAY` + `resolve_side_display_map()` in `config.py`; `load_config()` merges built-in defaults when PyYAML absent (warns, does not block); `member_side_for_classification()` routes unmapped → Other, work → Backend/QA/Web/Mobile; executive-summary **Warnings** for config/consistency; tests in `test_config.py`; removed dead `stageMapping` / `leaveMappingRules` from em-config.
 - 2026-06-05 — **Jira links always clickable:** `resolve_jira_site_url` derives site from issue payloads when config/CLI absent; `linkify_bare_issue_keys` safety-net on report and standup output.

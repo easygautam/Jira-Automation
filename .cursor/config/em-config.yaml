@@ -1,13 +1,14 @@
 # Engineering Manager workflow configuration
 # Consumed by scripts/sprintkit (loaded via sprintkit/config.py) and the
 # /sprint-report pipeline. Fill projectKey (and optionally cloudId) before the
-# first live Jira run. Resolve an empty cloudId with Atlassian MCP
-# getAccessibleAtlassianResources.
+# first live Jira run. projectKey is the default for sprint-report when the
+# user does not specify a project; epic commands derive project from the epic key.
+# Resolve an empty cloudId with Atlassian MCP getAccessibleAtlassianResources.
 
 jira:
   cloudId: "ba5d328f-f4a3-4652-ba4d-aba5e33ecabd"
   siteUrl: https://physicswallah001.atlassian.net   # Base URL for clickable issue links
-  projectKey: "VP"             # Jira project key (substituted into activeSprintJql)
+  projectKey: "VP"             # Default project for sprint-report JQL (override via --project)
   boardId: 189                  # Optional; for board-scoped queries
   activeSprintJql: 'project = {projectKey} AND sprint in openSprints()'
   sprintDiscovery:
@@ -21,8 +22,8 @@ fields:
   startDate: customfield_10015   # Jira Cloud Start date; auto-discovered if wrong
 
 epicEstimation:
-  epicScopeJql: 'project = {projectKey} AND (key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey})'
-  taskScopeJql: 'project = {projectKey} AND parent in ({parentKeys})'
+  epicScopeJql: 'key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey}'
+  taskScopeJql: 'parent in ({parentKeys})'
 
 scheduling:
   hoursPerDay: 8

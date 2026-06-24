@@ -28,7 +28,7 @@ Scheduling (`normalize.py` + `schedule.py`, 8h/day), bug effort (`bugs.py`), dat
 python scripts/sprint_report.py \
   --issues scripts/.tmp/issues.json \
   --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --project {projectKey}   # optional when jira.projectKey is set in config
 ```
 
 Options: `--recalc` (snapshot prior `schedule.json`, add a **Schedule Delta**), `--prior-schedule PATH`, `--standup` (chat-only summary), `--sprint-start/--sprint-end` (window override), `--today YYYY-MM-DD`, `--output PATH`.
@@ -52,8 +52,7 @@ No sprint window. Requires `--epic {epicKey}`. **Stdout JSON only** — agent em
 python scripts/epic_estimation.py \
   --epic {epicKey} \
   --issues scripts/.tmp/epic-{epicKey}-issues.json \
-  --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --config .cursor/config/em-config.yaml
 ```
 
 | Module | Role |
@@ -74,8 +73,7 @@ Same fetch and pipeline as epic estimation, then posts Block Kit to Slack.
 python scripts/epic_estimation_slack.py \
   --epic {epicKey} \
   --issues scripts/.tmp/epic-{epicKey}-issues.json \
-  --config .cursor/config/em-config.yaml \
-  --project {projectKey}
+  --config .cursor/config/em-config.yaml
 ```
 
 Options: `--dry-run` (Block Kit JSON only), `--check-slack` (verify token + channel, no post). Cloud install: [`.cursor/environment.json`](.cursor/environment.json).

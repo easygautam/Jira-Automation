@@ -74,7 +74,7 @@ def run_pipeline(
     issues: list[dict[str, Any]],
     config: dict[str, Any],
     *,
-    project: str = "VP",
+    project: str,
     sprint_label: str = "Active Sprint",
     sprint_start: str | None = None,
     sprint_end: str | None = None,
@@ -143,6 +143,8 @@ def standup_summary(
     issues: list[dict[str, Any]],
     config: dict[str, Any] | None = None,
     jira_site_url: str | None = None,
+    *,
+    project: str | None = None,
 ) -> str:
     """Short chat-oriented standup text: blockers, overdue, at-risk, DQ counts."""
     issue_by_key = {i["key"]: i for i in issues}
@@ -202,5 +204,5 @@ def standup_summary(
         lines.append(f"Data quality: {flagged} flagged tickets ({top}).")
 
     text = "\n".join(lines).rstrip() + "\n"
-    project_key = (config or {}).get("jira", {}).get("projectKey")
+    project_key = project or (config or {}).get("jira", {}).get("projectKey")
     return linkify_bare_issue_keys(text, site, project_key=project_key)
