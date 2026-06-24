@@ -23,10 +23,16 @@ from sprintkit.jira_model import (
 from sprintkit.teams import (
     TEAM_OTHER,
     _prefix_tokens,
+    delivery_platform,
+    is_jira_teams_uat_value,
+    jira_teams_field_value,
     load_prefix_alias_sets,
     team_from_first_prefix,
     team_from_issue,
+    team_from_jira_field,
+    team_from_jira_field_value,
     team_from_prefix_tokens,
+    team_from_title,
 )
 
 PLATFORM_KEYS = ("backend", "frontend", "mobile")
@@ -225,6 +231,9 @@ def assessment_target(
         return None
     if team in PLATFORM_KEYS:
         return team
+    plat = delivery_platform(team, config)
+    if plat in PLATFORM_KEYS:
+        return plat
     return None
 
 
@@ -252,7 +261,8 @@ def task_from_pipe_prefix_team(
     if _summary_has_assessment_segment(summary):
         return None
     defaults = timeline_cfg.get("defaultTaskByTeam") or _DEFAULT_TASK_BY_TEAM
-    return defaults.get(team)
+    plat = delivery_platform(team, config)
+    return defaults.get(team) or (defaults.get(plat) if plat else None)
 
 
 def _is_qa_test_planning(summary: str) -> bool:
@@ -340,11 +350,21 @@ def classify_issue(
 
     assess_platform = assessment_target(summary, config)
     if assess_platform in PLATFORM_KEYS:
-        return _work(assess_platform, STAGE_TECH_SOLUTIONING, assess_platform)
+        title_team = team_from_title(summary, config) or assess_platform
+        return _work(assess_platform, STAGE_TECH_SOLUTIONING, title_team)
 
     uat_platform = platform_uat_from_segments(summary, config)
     if uat_platform:
         return _work(uat_platform, STAGE_UAT, TEAM_PRODUCT_DESIGN)
+
+    title_team = team_from_title(summary, config)
+    field_value = jira_teams_field_value(issue, config)
+    if not title_team and field_value:
+        if is_jira_teams_uat_value(field_value, config):
+            return _work("frontend", STAGE_UAT, TEAM_PRODUCT_DESIGN)
+        field_team = team_from_jira_field_value(field_value, config)
+        if field_team in ("data_engineering", "devops"):
+            return _work("backend", STAGE_DEVELOPMENT, field_team)
 
     team = team_from_issue(issue, teams_cfg, config)
     itype = issue_type_name(issue)
@@ -377,7 +397,18 @@ def classify_issue(
         return {"kind": "unmapped", "platform": None, "stage": None, "team": team}
 
     dev_stage = task_from_pipe_prefix_team(summary, team, timeline_cfg, itype, config)
-    if dev_stage and team in PLATFORM_KEYS:
-        return _work(team, dev_stage, team)
+    if dev_stage:
+        plat = delivery_platform(team, config) or (team if team in PLATFORM_KEYS else None)
+        if plat in PLATFORM_KEYS:
+            return _work(plat, dev_stage, team)
+
+    plat = delivery_platform(team, config)
+    if plat in PLATFORM_KEYS and itype in ("task", "sub-task", "subtask"):
+        title_resolved = team_from_title(summary, config)
+        if title_resolved == team or team_from_jira_field(issue, config) == team:
+            defaults = timeline_cfg.get("defaultTaskByTeam") or _DEFAULT_TASK_BY_TEAM
+            stage = defaults.get(plat) or defaults.get(team)
+            if stage:
+                return _work(plat, stage, team)
 
     return {"kind": "unmapped", "platform": None, "stage": None, "team": team}

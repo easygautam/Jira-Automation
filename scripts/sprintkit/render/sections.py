@@ -32,7 +32,16 @@ from sprintkit.timeline import side_display, format_calc_days
 STATUS_RANK = {"blocked": 0, "delayed": 1, "at_risk": 2, "on_track": 3, "tbd": 4}
 SCHEDULE_TEAM_ORDER = ("Backend", "Web", "Mobile", "QA", "Other")
 BUG_FIX_SIDE_COLUMNS = ("Backend", "Web", "Mobile", "QA", "Other")
-TEAM_PLAN_ORDER = ("Backend", "Web", "Mobile", "Product + Design", "QA", "Other")
+TEAM_PLAN_ORDER = (
+    "Backend",
+    "Data Engineering",
+    "DevOps",
+    "Web",
+    "Mobile",
+    "Product + Design",
+    "QA",
+    "Other",
+)
 
 
 # --- shared epic helpers --------------------------------------------------

@@ -20,6 +20,7 @@ fields:
   sprint: customfield_10020      # Jira Cloud default; overwritten after auto-discovery
   rank: customfield_10019        # Jira Rank (LexoRank); drag-and-drop backlog order
   startDate: customfield_10015   # Jira Cloud Start date; auto-discovered if wrong
+  teams: customfield_10218       # Jira Teams select field (secondary team source)
 
 epicEstimation:
   epicScopeJql: 'key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey}'
@@ -98,12 +99,36 @@ dataQuality:
 teamPrefixMapping:
   qa:
     aliases: [qa]
+  data_engineering:
+    aliases: [ds, de]
   backend:
     aliases: [be, backend, api, dag, ppadmin, admin]
   frontend:
     aliases: [web, website, frontend, frontent, fe]
   mobile:
     aliases: [mobile, app, android, ios]
+
+# Jira Teams option value → internal team key (Teams plan row); title prefix wins first
+teamFieldMapping:
+  Android: mobile
+  IOS: mobile
+  KMM: mobile
+  Admin: backend
+  Backend: backend
+  Data Engineering: data_engineering
+  DevOps: devops
+  Web: frontend
+  QA: qa
+  Product: product_design
+  Analytics: product_design
+
+# Execution stages + schedule deps: DE/DevOps deliver on Backend platform
+teamDeliveryPlatform:
+  backend: backend
+  data_engineering: backend
+  devops: backend
+
+teamFieldUatValues: [Product, Analytics]
 
 timeline:
   hoursPerDay: 6
@@ -115,6 +140,8 @@ timeline:
     backend: Backend
     frontend: Web
     mobile: Mobile
+    data_engineering: "Data Engineering"
+    devops: DevOps
     product_design: "Product + Design"
     qa: QA
     other: Other

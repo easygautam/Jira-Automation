@@ -12,6 +12,7 @@ How to structure issues, titles, estimates, and dates in Jira during a sprint. F
 | **Epic link** | Link tasks and bugs to the correct **Epic** (via Story parent or direct parent) |
 | **Assignee** | Set the person doing the work |
 | **Summary** | Use the title rules in this doc (`BE \|`, `WEB \|`, `APP \|`, `QA \|`, or `Leave \|`) |
+| **Teams** | Set the **Teams** field when the title has no platform prefix (fallback for reporting) |
 
 **Tasks and Sub-tasks:** set **Original Estimate** when the work is ready to plan.
 
@@ -41,8 +42,11 @@ For Backend, Web, and Mobile work, the **first part of the summary before `|`** 
 | **BE** | Backend |
 | **WEB** | Web |
 | **APP** | Mobile |
+| **DS** / **DE** | Data Engineering (Backend delivery) |
 
 Use **BE**, **WEB**, and **APP** everywhere — assessment, development, bugs (when you want a clear platform), and release-related work.
+
+**DS** and **DE** prefix Data Engineering work (delivers on the Backend pipeline; separate Teams-plan row).
 
 **QA** titles always start with **`QA |`**. Add **WEB**, **APP**, or **BE** in the title when the work is for one platform (see [QA titles](#qa-titles)).
 
@@ -63,6 +67,8 @@ APP | Assessment
 BE | Add coupon API
 WEB | Checkout flow refactor
 APP | Registration funnel UI
+DS | Assessment | BYOC scope
+DE | Pipeline job setup
 ```
 
 ### Do not use as the first prefix
@@ -73,6 +79,23 @@ APP | Registration funnel UI
 | `Android \| Assessment` | `APP \| Assessment` |
 | `Stage-APP \| Icon wrong` | `APP \| Icon wrong` or `WEB \| …` |
 | `Enhancement: …` (no pipe) | `BE \| Enhancement: …` |
+
+### Teams field (fallback)
+
+When a task title has **no** `BE |` / `WEB |` / `APP |` / `QA |` prefix, set the Jira **Teams** field so sprint reports can bucket effort:
+
+| Teams field | Report row | Delivery |
+|-------------|------------|----------|
+| Android, IOS, KMM | Mobile | Mobile Development |
+| Admin, Backend | Backend | Backend Development |
+| Data Engineering | Data Engineering | Backend Development |
+| DevOps | DevOps | Backend Development |
+| Web | Web | Web Development |
+| QA | QA | QA (title still needs platform for stage mapping) |
+| Product, Analytics | Product + Design | UAT |
+| Other Teams | Other (flagged) | — |
+
+Title prefix **always wins** when both are set (e.g. `BE | …` with Teams=Web → Backend).
 
 ---
 

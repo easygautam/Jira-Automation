@@ -31,7 +31,7 @@ Follow `.cursor/skills/jira-domain/SKILL.md`:
 
 1. `getAccessibleAtlassianResources` when `cloudId` empty.
 2. Discover the Sprint field (`getJiraIssueTypeMetaWithFields`) if needed → `fields.sprint` in config.
-3. `searchJiraIssuesUsingJql` with the sprint JQL (substitute `{projectKey}`); include `fields.sprint` and `fields.rank`.
+3. `searchJiraIssuesUsingJql` with the sprint JQL (substitute `{projectKey}`); include `fields.sprint`, `fields.rank`, and `fields.teams`.
 4. Paginate until all issues are fetched.
 5. Write raw issues to `scripts/.tmp/issues.json`.
 

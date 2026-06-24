@@ -20,14 +20,41 @@ DEFAULT_SIDE_DISPLAY: dict[str, str] = {
     "backend": "Backend",
     "frontend": "Web",
     "mobile": "Mobile",
+    "data_engineering": "Data Engineering",
+    "devops": "DevOps",
     "product_design": "Product + Design",
     "qa": "QA",
     "other": "Other",
     "unknown": "Other",
 }
 
+DEFAULT_TEAM_FIELD_MAPPING: dict[str, str] = {
+    "Android": "mobile",
+    "IOS": "mobile",
+    "KMM": "mobile",
+    "Admin": "backend",
+    "Backend": "backend",
+    "Data Engineering": "data_engineering",
+    "DevOps": "devops",
+    "Web": "frontend",
+    "QA": "qa",
+    "Product": "product_design",
+    "Analytics": "product_design",
+}
+
+DEFAULT_TEAM_DELIVERY_PLATFORM: dict[str, str] = {
+    "backend": "backend",
+    "data_engineering": "backend",
+    "devops": "backend",
+    "frontend": "frontend",
+    "mobile": "mobile",
+}
+
+DEFAULT_TEAM_FIELD_UAT_VALUES: list[str] = ["Product", "Analytics"]
+
 DEFAULT_TEAM_PREFIX_MAPPING: dict[str, dict[str, list[str]]] = {
     "qa": {"aliases": ["qa"]},
+    "data_engineering": {"aliases": ["ds", "de"]},
     "backend": {"aliases": ["be", "backend", "api", "dag", "ppadmin", "admin"]},
     "frontend": {"aliases": ["web", "website", "frontend", "frontent", "fe"]},
     "mobile": {"aliases": ["mobile", "app", "android", "ios"]},
@@ -61,6 +88,10 @@ def default_config() -> dict[str, Any]:
         "teamPrefixMapping": {
             team: dict(entry) for team, entry in DEFAULT_TEAM_PREFIX_MAPPING.items()
         },
+        "teamFieldMapping": dict(DEFAULT_TEAM_FIELD_MAPPING),
+        "teamDeliveryPlatform": dict(DEFAULT_TEAM_DELIVERY_PLATFORM),
+        "teamFieldUatValues": list(DEFAULT_TEAM_FIELD_UAT_VALUES),
+        "fields": {"teams": "customfield_10218"},
         "dataQuality": {
             "bugActiveStatuses": list(DEFAULT_BUG_ACTIVE_STATUSES),
             "bugNoWorklogStatuses": list(DEFAULT_BUG_NO_WORKLOG_STATUSES),

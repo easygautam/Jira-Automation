@@ -36,7 +36,16 @@ from sprintkit.stages import (
 )
 from sprintkit.teams import TEAM_OTHER
 
-TEAM_PLAN_SIDES = ("Backend", "Web", "Mobile", "Product + Design", "QA", "Other")
+TEAM_PLAN_SIDES = (
+    "Backend",
+    "Data Engineering",
+    "DevOps",
+    "Web",
+    "Mobile",
+    "Product + Design",
+    "QA",
+    "Other",
+)
 
 _WORK_MEMBER_STAGES = frozenset(
     {"Development", "Tech Solutioning", STAGE_STAGE_TESTING, STAGE_QA_TEST_PLANNING}

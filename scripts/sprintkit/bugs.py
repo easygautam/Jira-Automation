@@ -14,8 +14,22 @@ from sprintkit.jira_model import (
     time_spent_seconds,
 )
 from sprintkit.config import resolve_side_display_map
-from sprintkit.teams import team_from_issue
+from sprintkit.teams import delivery_platform, team_from_issue
 from sprintkit.timeline import side_display
+
+BUG_EPIC_SIDE_COLUMNS = frozenset({"Backend", "Web", "Mobile", "QA", "Other"})
+
+
+def bug_epic_side_label(
+    team: str,
+    side_display_map: dict[str, str],
+    config: dict[str, Any],
+) -> str:
+    """Epic table column: DE/DevOps roll into Backend delivery."""
+    if delivery_platform(team, config) == "backend":
+        return "Backend"
+    side = side_display(team, side_display_map)
+    return side if side in BUG_EPIC_SIDE_COLUMNS else "Other"
 
 
 def collect_sprint_epic_keys(
@@ -62,7 +76,7 @@ def build_bug_effort_breakdown(
             est_h = time_spent_seconds(issue, config) / 3600.0
             member = assignee_name(issue)
             team = team_from_issue(issue, teams_cfg, config)
-            side = side_display(team, side_display_map)
+            side = bug_epic_side_label(team, side_display_map, config)
             side_hours[side] = side_hours.get(side, 0.0) + est_h
             if member not in member_rows:
                 member_rows[member] = {"member": member, "effortsHours": 0.0, "bugCount": 0}

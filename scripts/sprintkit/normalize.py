@@ -18,7 +18,7 @@ from sprintkit.jira_model import (
     resolve_epic,
     resolve_story,
 )
-from sprintkit.teams import team_from_issue
+from sprintkit.teams import delivery_platform, team_from_issue
 
 
 def find_backend_dependency(
@@ -36,7 +36,7 @@ def find_backend_dependency(
         epic = resolve_epic(issue, index)
         if not epic or epic.get("key") != epic_key:
             continue
-        if team_from_issue(issue, teams_cfg, config) != "backend":
+        if delivery_platform(team_from_issue(issue, teams_cfg, config), config) != "backend":
             continue
         t = issue_type_name(issue)
         if t in ("task", "sub-task", "subtask"):
@@ -80,7 +80,8 @@ def normalize(
 
         team = team_from_issue(issue, teams_cfg, config)
         dependencies: list[dict[str, Any]] = []
-        if team in ("mobile", "frontend", "qa"):
+        plat = delivery_platform(team, config)
+        if plat in ("mobile", "frontend") or team == "qa":
             be_key = find_backend_dependency(
                 epic_key, index, teams_cfg, issue.get("key", ""), config
             )

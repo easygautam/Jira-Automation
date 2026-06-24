@@ -33,7 +33,7 @@ Follow `.cursor/skills/jira-domain/SKILL.md` epic-scope rules:
 2. Discover Start date field if needed → `fields.startDate` in config.
 3. **Pass 1** — `searchJiraIssuesUsingJql` with `epicEstimation.epicScopeJql` (substitute `{epicKey}` only).
 4. **Pass 2** — fetch tasks/sub-tasks: `epicEstimation.taskScopeJql` with `{parentKeys}` = story keys from pass 1.
-5. Fields: sprint fetch set **plus** `duedate`, `fields.startDate`.
+5. Fields: sprint fetch set **plus** `duedate`, `fields.startDate`, `fields.teams`.
 6. Merge + dedupe → `scripts/.tmp/epic-{epicKey}-issues.json`.
 
 ### RUN

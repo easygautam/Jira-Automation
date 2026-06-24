@@ -1,9 +1,14 @@
-"""Step 2 — team detection from Jira issue summary prefix, labels, components."""
+"""Step 2 — team detection from Jira summary prefix, Teams field, labels, components."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from sprintkit.config import (
+    DEFAULT_TEAM_DELIVERY_PLATFORM,
+    DEFAULT_TEAM_FIELD_MAPPING,
+    DEFAULT_TEAM_FIELD_UAT_VALUES,
+)
 from sprintkit.jira_model import get_field
 
 TEAM_OTHER = "other"
@@ -11,10 +16,19 @@ TEAM_OTHER = "other"
 # Defaults when teamPrefixMapping is absent from em-config.yaml
 _DEFAULT_PREFIX_MAPPING: dict[str, list[str]] = {
     "qa": ["qa"],
+    "data_engineering": ["ds", "de"],
     "backend": ["be", "backend", "api", "dag", "ppadmin", "admin"],
     "frontend": ["web", "website", "frontend", "frontent", "fe"],
     "mobile": ["mobile", "app", "android", "ios"],
 }
+
+_PREFIX_TEAM_ORDER: tuple[str, ...] = (
+    "qa",
+    "data_engineering",
+    "backend",
+    "frontend",
+    "mobile",
+)
 
 
 def _casefold(text: str) -> str:
@@ -25,14 +39,71 @@ def _casefold(text: str) -> str:
 def load_prefix_alias_sets(config: dict[str, Any] | None = None) -> dict[str, frozenset[str]]:
     """Build team -> alias set from config teamPrefixMapping (or defaults)."""
     cfg = (config or {}).get("teamPrefixMapping") or {}
+    all_teams = set(_DEFAULT_PREFIX_MAPPING) | set(cfg.keys())
     result: dict[str, frozenset[str]] = {}
-    for team, default_aliases in _DEFAULT_PREFIX_MAPPING.items():
+    for team in all_teams:
+        default_aliases = _DEFAULT_PREFIX_MAPPING.get(team, [])
         entry = cfg.get(team) or {}
         aliases = entry.get("aliases") if isinstance(entry, dict) else entry
         if not aliases:
             aliases = default_aliases
-        result[team] = frozenset(_casefold(a) for a in aliases)
+        if aliases:
+            result[team] = frozenset(_casefold(a) for a in aliases)
     return result
+
+
+def load_team_field_mapping(config: dict[str, Any] | None = None) -> dict[str, str]:
+    return dict((config or {}).get("teamFieldMapping") or DEFAULT_TEAM_FIELD_MAPPING)
+
+
+def load_team_delivery_platform(config: dict[str, Any] | None = None) -> dict[str, str]:
+    merged = dict(DEFAULT_TEAM_DELIVERY_PLATFORM)
+    merged.update((config or {}).get("teamDeliveryPlatform") or {})
+    for platform in ("backend", "frontend", "mobile"):
+        merged.setdefault(platform, platform)
+    return merged
+
+
+def jira_teams_field_value(
+    issue: dict[str, Any], config: dict[str, Any] | None = None
+) -> str | None:
+    """Read Jira Teams select field option label (e.g. Android, Data Engineering)."""
+    fields_cfg = (config or {}).get("fields") or {}
+    field_id = fields_cfg.get("teams", "customfield_10218")
+    raw = get_field(issue, field_id)
+    if not raw:
+        return None
+    if isinstance(raw, dict):
+        return raw.get("value") or None
+    return str(raw) if raw else None
+
+
+def team_from_jira_field_value(
+    value: str | None, config: dict[str, Any] | None = None
+) -> str | None:
+    if not value:
+        return None
+    return load_team_field_mapping(config).get(value)
+
+
+def team_from_jira_field(
+    issue: dict[str, Any], config: dict[str, Any] | None = None
+) -> str | None:
+    return team_from_jira_field_value(jira_teams_field_value(issue, config), config)
+
+
+def is_jira_teams_uat_value(value: str | None, config: dict[str, Any] | None = None) -> bool:
+    if not value:
+        return False
+    uat_values = (config or {}).get("teamFieldUatValues") or DEFAULT_TEAM_FIELD_UAT_VALUES
+    return value in uat_values
+
+
+def delivery_platform(team: str | None, config: dict[str, Any] | None = None) -> str | None:
+    """Map internal team key to delivery platform (backend | frontend | mobile)."""
+    if not team or team == TEAM_OTHER:
+        return None
+    return load_team_delivery_platform(config).get(team)
 
 
 def first_summary_prefix(summary: str) -> str | None:
@@ -70,7 +141,7 @@ def team_from_prefix_tokens(
     tokens: list[str],
     alias_sets: dict[str, frozenset[str]],
 ) -> str | None:
-    order = ("qa", "backend", "frontend", "mobile")
+    order = _PREFIX_TEAM_ORDER
     for team in order:
         aliases = alias_sets.get(team, frozenset())
         for t in tokens:
@@ -109,6 +180,14 @@ def team_from_summary_start(
     return None
 
 
+def team_from_title(summary: str, config: dict[str, Any] | None = None) -> str | None:
+    """Team from summary title only (pipe prefix or start-with alias)."""
+    alias_sets = load_prefix_alias_sets(config)
+    if "|" in summary:
+        return team_from_first_prefix(summary, alias_sets)
+    return team_from_summary_start(summary, alias_sets)
+
+
 def team_from_issue(
     issue: dict[str, Any],
     teams_cfg: dict[str, list[str]],
@@ -117,13 +196,13 @@ def team_from_issue(
     summary = (get_field(issue, "summary") or "").strip()
     alias_sets = load_prefix_alias_sets(config)
 
-    if "|" in summary:
-        from_prefix = team_from_first_prefix(summary, alias_sets)
-        return from_prefix if from_prefix else TEAM_OTHER
+    from_title = team_from_title(summary, config)
+    if from_title:
+        return from_title
 
-    from_start = team_from_summary_start(summary, alias_sets)
-    if from_start:
-        return from_start
+    from_field = team_from_jira_field(issue, config)
+    if from_field:
+        return from_field
 
     labels = [x.lower() for x in (get_field(issue, "labels") or [])]
     components = [(c.get("name") or "").lower() for c in (get_field(issue, "components") or [])]

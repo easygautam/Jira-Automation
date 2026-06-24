@@ -13,7 +13,7 @@ PLAN → FETCH (Load) → RUN (map + calculate + render) → REPORT
 | Step | What | Module |
 |------|------|--------|
 | 1. Load sprint items | MCP fetch → `issues.json`; derive active sprint window | agent fetch + `sprintkit/sprint_window.py` |
-| 2. Map task → platform/team | first `|` prefix, labels, components | `sprintkit/teams.py` |
+| 2. Map task → platform/team | first `\|` prefix, then Jira **Teams** field (`fields.teams`), then labels | `sprintkit/teams.py` |
 | 3. Map leave → team leaves | `Leave | Planned/Unplanned` → leave buckets | `sprintkit/stages.py` |
 | 4. Map task → stage | assessment / development / testing / release / UAT | `sprintkit/stages.py` |
 | 5. Calculate team effort per stage | per epic / team / member, 6h/day | `sprintkit/timeline.py` |
@@ -87,7 +87,7 @@ Options: `--dry-run` (Block Kit JSON only), `--check-slack` (verify token + chan
 
 `config.py` · `jira_model.py` · `teams.py` · `stages.py` · `sprint_window.py` · `normalize.py` · `schedule.py` · `delta.py` · `timeline.py` · `stage_dates.py` · `bugs.py` · `quality.py` · `pipeline.py` · `epic_pipeline.py` · `slack_client.py` · `render/{markdown,sections,report,epic_sections,slack_blocks}.py`. Tests in `scripts/tests/` (incl. `test_pipeline_golden.py`, `test_stage_dates.py`, `test_epic_pipeline.py`, `test_slack_blocks.py`); fixtures in `scripts/tests/fixtures/`.
 
-Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment only; else **Other**). **Teams plan Other** = segment mapping failed only (`member_side_for_classification` in `timeline.py`). Stage/leave mapping: `sprintkit/stages.py` — **pipe-segment only** (no keyword substring rules); per-platform **Tech Solutioning** + **QA Test Planning** rows; `{Web|App} | UAT | …` → Product + Design team; QA requires platform in segment 2. Side labels: `resolve_side_display_map()` in `config.py`. Details: `jira-domain` skill.
+Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment; title wins). **`DS |` / `DE |`** → Data Engineering. **Secondary:** Jira **Teams** select field (`fields.teams` / `teamFieldMapping`) when prefix unmatched — Mobile (Android/IOS/KMM), Backend (Admin/Backend), Data Engineering & DevOps (separate Teams-plan rows, Backend delivery Development stage), Web, QA, Product/Analytics → UAT. Unmapped → **Other**. **Teams plan Other** = segment mapping failed only (`member_side_for_classification` in `timeline.py`). Stage/leave mapping: `sprintkit/stages.py` — **pipe-segment only** (no keyword substring rules); per-platform **Tech Solutioning** + **QA Test Planning** rows; `{Web|App} | UAT | …` → Product + Design team; QA requires platform in segment 2. Side labels: `resolve_side_display_map()` in `config.py`. Details: `jira-domain` skill.
 
 **Sprint window rule:** reports cover the complete active sprint (sprint start → end) across all statuses (closed/deferred included); each section applies its own status condition. Calendar Start/End columns are deferred (no Start/End columns in member/stage tables).
 
