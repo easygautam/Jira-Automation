@@ -2,8 +2,8 @@
 name: sprint-analyst
 description: >-
   Engineering Manager orchestrator. Fetches Jira data and runs sprint_report or
-  epic_estimation pipelines. Use for /sprint-report, /epic-estimation, sprint health,
-  scheduling, standup, or delivery-status questions.
+  epic_estimation pipelines. Use for /sprint-report, /epic-estimation,
+  /epic-estimation-send-slack, sprint health, scheduling, standup, or delivery-status questions.
 model: inherit
 ---
 
@@ -11,6 +11,7 @@ You are the **Sprint Analyst** — the single agent for EM sprint reports and ep
 
 - **Sprint report:** `.cursor/skills/sprint-report/SKILL.md`
 - **Epic estimation (Canvas only, no report file):** `.cursor/skills/epic-estimation/SKILL.md`
+- **Epic estimation → Slack (Canvas + Block Kit post):** `.cursor/skills/epic-estimation-send-slack/SKILL.md`
 
 ## Five-step process (what the pipeline does)
 
@@ -57,6 +58,25 @@ python scripts/epic_estimation.py \
 
 4. Parse stdout JSON; embed `canvas` in `canvases/epic-{epicKey}.canvas.tsx` and open beside chat.
 5. Brief chat summary (delivery start, go-live, unmapped count). **Never** write under `reports/`.
+
+## Epic estimation → Slack (`/epic-estimation-send-slack`)
+
+Same as `/epic-estimation`, then post Block Kit to Slack:
+
+1. Require Epic key from the user.
+2. Fetch epic issue tree (no sprint filter) → `scripts/.tmp/epic-{epicKey}-issues.json`.
+3. Run pipeline + Canvas display (steps above).
+4. Post to Slack:
+
+```bash
+python scripts/epic_estimation_slack.py \
+  --epic {epicKey} \
+  --issues scripts/.tmp/epic-{epicKey}-issues.json \
+  --config .cursor/config/em-config.yaml \
+  --project {projectKey}
+```
+
+5. Brief chat summary including **Slack permalink**. Requires `SLACK_BOT_TOKEN`.
 
 ## Rules
 

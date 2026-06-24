@@ -76,7 +76,12 @@ reporting:
 slack:
   channel: gautam-personal-agent
   botTokenEnv: SLACK_BOT_TOKEN
-  # channelId: C0123456789   # optional — skip name lookup
+  channelIdEnv: SLACK_CHANNEL_ID
+  # Local: copy .env.example → .env.local. Cloud: add SLACK_BOT_TOKEN in Dashboard → Cloud Agents → Secrets.
+  envFiles:
+    - .env.local
+    - .env
+  # channelId: C0123456789   # optional — recommended for cloud (avoids channels.list lookup)
 
 # Data quality: bug time flags use status lists below (whitespace/case normalized)
 dataQuality:

@@ -14,6 +14,7 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
    - Recalculate (priority/scope change): `/sprint-report` with `--recalc` (adds a Schedule Delta)
    - Daily standup (chat only): `/sprint-report` with `--standup`
    - `/epic-estimation` → `.cursor/skills/epic-estimation/SKILL.md` (Canvas only — **no report file**)
+   - `/epic-estimation-send-slack` → `.cursor/skills/epic-estimation-send-slack/SKILL.md` (Canvas + Slack Block Kit)
    - `/improve-workflow` → `.cursor/skills/improve-workflow/SKILL.md`
 4. Sprint report — one command saves `reports/sprint-{YYYY-MM-DD}.md`:
 
@@ -30,7 +31,15 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
      --config .cursor/config/em-config.yaml --project {projectKey}
    ```
 
-6. Pipeline and file inventory: `.cursor/WORKFLOW.md`
+6. Epic estimation → Slack — same pipeline + Canvas, then Block Kit post (`SLACK_BOT_TOKEN`):
+
+   ```bash
+   python scripts/epic_estimation_slack.py --epic {epicKey} \
+     --issues scripts/.tmp/epic-{epicKey}-issues.json \
+     --config .cursor/config/em-config.yaml --project {projectKey}
+   ```
+
+7. Pipeline and file inventory: `.cursor/WORKFLOW.md`
 
 ## Five-step process
 
@@ -42,4 +51,5 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
 - recalculate schedule, priority change, re-prioritize
 - daily standup, scrum, blockers, talking points
 - epic estimation, epic effort, epic timeline, stage dates, go-live estimate
+- epic estimation slack, send epic to slack, post epic estimation
 - improve workflow, update EM automation

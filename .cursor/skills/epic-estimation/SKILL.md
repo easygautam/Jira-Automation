@@ -52,7 +52,7 @@ Stdout is a single JSON object (`epicKey`, `deliveryStart`, `goLive`, `timeline`
 
 1. Parse stdout JSON.
 2. Write/update `~/.cursor/projects/Users-easygautam-Documents-Sprint-Automation/canvases/epic-{epicKey}.canvas.tsx` — embed the `canvas` object inline (see canvas skill).
-3. Open the canvas beside chat.
+3. **Do not** call MCP `open_resource` to open the canvas — it can hang. Instead, include a markdown link to the `.canvas.tsx` file and tell the user to click it to open beside chat.
 4. Brief chat summary: delivery start, go-live, unmapped count, top warnings.
 
 **Do not** write `reports/*.md` or use `--output`.

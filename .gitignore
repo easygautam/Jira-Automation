@@ -1,6 +1,11 @@
 .DS_Store
 .venv/
 
+# Secrets — never commit (use .env.example as template; Cursor Cloud Secrets for cloud agents)
+.env
+.env.local
+.env.*.local
+
 # Generated reports and pipeline temp (keep repo lean for agents)
 reports/sprint-*.md
 scripts/.tmp/

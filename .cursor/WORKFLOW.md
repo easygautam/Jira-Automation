@@ -2,7 +2,7 @@
 
 Canonical inventory for agents. **Runbooks:** `.cursor/skills/sprint-report/SKILL.md` · `.cursor/skills/epic-estimation/SKILL.md`. **Agent:** `.cursor/agents/sprint-analyst.md`.
 
-One agent (`sprint-analyst`) drives two commands. **Sprint report** fetches the active sprint and saves `reports/sprint-{date}.md`. **Epic estimation** fetches one Epic (no sprint filter), computes stage Start/End dates, and displays a **Cursor Canvas** beside chat — **never** writes under `reports/`.
+One agent (`sprint-analyst`) drives three commands. **Sprint report** fetches the active sprint and saves `reports/sprint-{date}.md`. **Epic estimation** fetches one Epic (no sprint filter), computes stage Start/End dates, and displays a **Cursor Canvas** beside chat — **never** writes under `reports/`. **Epic estimation → Slack** extends epic estimation with a Block Kit post to `#gautam-personal-agent`.
 
 ## Five-step process → pipeline
 
@@ -64,9 +64,30 @@ python scripts/epic_estimation.py \
 
 Fetch: two-pass JQL (`epicEstimation.epicScopeJql` + `taskScopeJql` in config). Stage date rules: `delivery-flow` skill.
 
+## Epic estimation → Slack command
+
+Same fetch and pipeline as epic estimation, then posts Block Kit to Slack.
+
+**Secrets:** local `.env.local` (see `.env.example`) or Cursor Cloud Agents → Secrets (`SLACK_BOT_TOKEN` as Runtime Secret). Optional `SLACK_CHANNEL_ID` avoids channel lookup on cloud.
+
+```bash
+python scripts/epic_estimation_slack.py \
+  --epic {epicKey} \
+  --issues scripts/.tmp/epic-{epicKey}-issues.json \
+  --config .cursor/config/em-config.yaml \
+  --project {projectKey}
+```
+
+Options: `--dry-run` (Block Kit JSON only), `--check-slack` (verify token + channel, no post). Cloud install: [`.cursor/environment.json`](.cursor/environment.json).
+
+| Module | Role |
+|--------|------|
+| `sprintkit/render/slack_blocks.py` | canvas JSON → Block Kit (table + monospace fallback) |
+| `sprintkit/slack_client.py` | channel resolve + `chat.postMessage` |
+
 ## Package (`scripts/sprintkit/`)
 
-`config.py` · `jira_model.py` · `teams.py` · `stages.py` · `sprint_window.py` · `normalize.py` · `schedule.py` · `delta.py` · `timeline.py` · `stage_dates.py` · `bugs.py` · `quality.py` · `pipeline.py` · `epic_pipeline.py` · `render/{markdown,sections,report,epic_sections}.py`. Tests in `scripts/tests/` (incl. `test_pipeline_golden.py`, `test_stage_dates.py`, `test_epic_pipeline.py`); fixtures in `scripts/tests/fixtures/`.
+`config.py` · `jira_model.py` · `teams.py` · `stages.py` · `sprint_window.py` · `normalize.py` · `schedule.py` · `delta.py` · `timeline.py` · `stage_dates.py` · `bugs.py` · `quality.py` · `pipeline.py` · `epic_pipeline.py` · `slack_client.py` · `render/{markdown,sections,report,epic_sections,slack_blocks}.py`. Tests in `scripts/tests/` (incl. `test_pipeline_golden.py`, `test_stage_dates.py`, `test_epic_pipeline.py`, `test_slack_blocks.py`); fixtures in `scripts/tests/fixtures/`.
 
 Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (first `|` segment only; else **Other**). **Teams plan Other** = segment mapping failed only (`member_side_for_classification` in `timeline.py`). Stage/leave mapping: `sprintkit/stages.py` — **pipe-segment only** (no keyword substring rules); per-platform **Tech Solutioning** + **QA Test Planning** rows; `{Web|App} | UAT | …` → Product + Design team; QA requires platform in segment 2. Side labels: `resolve_side_display_map()` in `config.py`. Details: `jira-domain` skill.
 
@@ -76,10 +97,10 @@ Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (firs
 
 - Jira title/estimate guide: [`docs/JIRA-BEST-PRACTICES.md`](../docs/JIRA-BEST-PRACTICES.md)
 - Config: `.cursor/config/em-config.yaml`
-- Commands: `sprint-report` (recalculate + standup are options), `epic-estimation` (canvas only), `improve-workflow` → matching skill under `.cursor/skills/`
+- Commands: `sprint-report` (recalculate + standup are options), `epic-estimation` (canvas only), `epic-estimation-send-slack` (canvas + Slack), `improve-workflow` → matching skill under `.cursor/skills/`
 - Rules: `em-workflow.mdc`, `schedule-engine.mdc`, `jira-read-only.mdc`
 - Agent: `.cursor/agents/sprint-analyst.md`
-- Skills: `sprint-report` (runbook), `epic-estimation`, `jira-domain`, `delivery-flow`, `improve-workflow`
+- Skills: `sprint-report` (runbook), `epic-estimation`, `epic-estimation-send-slack`, `jira-domain`, `delivery-flow`, `improve-workflow`
 
 ## Six deliverables (report order)
 
