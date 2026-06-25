@@ -18,8 +18,8 @@ from sprintkit.render.markdown import (  # noqa: E402
 from sprintkit.render.report import render_report  # noqa: E402
 from sprintkit.render.sections import (  # noqa: E402
     phase_for_epic,
-    render_bug_sections,
     render_data_quality_section,
+    render_epic_quality_report,
     render_schedule_delta_section,
     render_team_tasks_plan,
     render_timeline_sections,
@@ -161,19 +161,17 @@ class TestBugEffortTable(unittest.TestCase):
                 "sideHours": {"Backend": 2.0, "Web": 1.0},
             }
         ]
-        body = "\n".join(render_bug_sections(bug_data, JIRA_SITE))
+        body = "\n".join(render_epic_quality_report(bug_data, JIRA_SITE))
         self.assertIn(
-            "| Epic ID | Epic Name | Backend | Web | Mobile | QA | Other | Total | Bugs |",
+            "| Epic ID | Epic Name | Bugs | Backend | Web | Mobile | Other | Total |",
             body,
         )
         self.assertIn(
             "| [VP-2](https://physicswallah001.atlassian.net/browse/VP-2) "
-            "| Test PRD | 2.0 | 1.0 | — | — | — | 3.0 | 2 |",
+            "| Test PRD | 2 | 2.0 | 1.0 | — | — | 3.0 |",
             body,
         )
         self.assertIn("**Sprint bug effort total:** 3.0 h (Backend 2.0, Web 1.0", body)
-        self.assertIn("| Member | Bug effort (h) | Bug count |", body)
-        self.assertNotIn("| Member | Team |", body)
 
 
 class TestTimelineSectionsRender(unittest.TestCase):
@@ -370,7 +368,6 @@ class TestExecutiveSummary(unittest.TestCase):
             None,
             config=CONFIG,
         )
-        self.assertIn("[B1](https://physicswallah001.atlassian.net/browse/B1)", body)
         self.assertIn("active bugs (estimate not required yet)", body)
         self.assertIn("tasks missing Original Estimate", body)
 

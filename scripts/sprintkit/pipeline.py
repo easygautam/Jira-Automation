@@ -101,6 +101,11 @@ def run_pipeline(
     )
     schedule = compute_schedule(engine)
     timeline = build_timeline_breakdown(issues, schedule, config)
+    
+    from sprintkit.stage_dates import compute_stage_dates
+    for epic_row in timeline:
+        compute_stage_dates(epic_row, issues, config)
+
     bug_effort = build_bug_effort_breakdown(issues, schedule, config)
 
     report_warnings = config_warnings(config)

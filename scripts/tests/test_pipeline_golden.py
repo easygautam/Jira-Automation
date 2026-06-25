@@ -52,33 +52,19 @@ class TestPipelineGolden(unittest.TestCase):
         for header in (
             "## Executive summary",
             "## Delivery items (Epics)",
-            "## Timeline breakdown (Jira)",
-            "## Bug fix effort",
-            "## Team tasks plan",
-            "## Data quality flags",
-            "## Recommended actions",
+            "## Epic Quality Report",
         ):
             self.assertIn(header, self.md)
 
     def test_bug_effort_columns_reconcile(self):
         self.assertIn(
-            "| Epic ID | Epic Name | Backend | Web | Mobile | QA | Other | Total | Bugs |",
+            "| Epic ID | Epic Name | Bugs | Backend | Web | Mobile | Other | Total |",
             self.md,
         )
-        # The single Web bug (1h) appears in epic member detail.
-        self.assertIn("Bob Web | 1.0", self.md)
 
     def test_no_placeholder_start_end_columns(self):
         self.assertNotIn("| Start | End |", self.md)
         self.assertNotIn("placeholders", self.md)
-
-    def test_unmapped_work_has_blank_line_before_heading(self):
-        self.assertIn("#### Unmapped sprint work", self.md)
-        self.assertIn("VP-906", self.md)
-        idx = self.md.index("#### Unmapped sprint work")
-        preceding = self.md[:idx].rsplit("\n", 2)
-        # The line immediately before the heading must be blank.
-        self.assertEqual(preceding[-2], "")
 
     def test_standup_summary_renders(self):
         text = standup_summary(
@@ -100,12 +86,6 @@ class TestPipelineGolden(unittest.TestCase):
         self.assertIsNone(bare_table_key, "found unlinked issue key in table")
         bare_bullet_key = re.search(r"^- VP-\d+:", self.md, re.MULTILINE)
         self.assertIsNone(bare_bullet_key, "found unlinked issue key in list")
-
-    def test_backend_member_breakdown_not_under_other(self):
-        self.assertIn("**Backend** — member breakdown", self.md)
-        self.assertIn("Alice Backend", self.md)
-        demo_section = self.md.split("### [VP-900]", 1)[-1].split("### ", 1)[0]
-        self.assertNotIn("**Other** — member breakdown", demo_section)
 
 
 if __name__ == "__main__":

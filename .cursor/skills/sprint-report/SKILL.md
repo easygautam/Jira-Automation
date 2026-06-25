@@ -3,7 +3,7 @@ name: sprint-report
 description: >-
   Runbook for the EM sprint report: fetch Jira sprint data and run the single
   sprint_report pipeline that maps platform/team, leaves, and stages, calculates
-  team effort, and renders six deliverables. Use for /sprint-report, recalculation
+  team effort, and renders three deliverables. Use for /sprint-report, recalculation
   (Schedule Delta), daily standup, or sprint health questions.
 disable-model-invocation: true
 ---
@@ -39,7 +39,7 @@ The active sprint window is derived from the Jira sprint field inside the pipeli
 
 ### RUN — Steps 2–5 + render
 
-A single command maps each task to platform/team (Step 2), maps leave tasks (Step 3), maps each task to a stage (Step 4), calculates team effort per stage (Step 5), and renders the six deliverables:
+A single command maps each task to platform/team (Step 2), maps leave tasks (Step 3), maps each task to a stage (Step 4), calculates team effort per stage (Step 5), and renders the deliverables:
 
 ```bash
 python scripts/sprint_report.py \
@@ -65,16 +65,13 @@ The command writes `reports/sprint-{YYYY-MM-DD}.md` and prints a JSON summary (s
 
 Summarize on_track / at_risk / delayed / blocked in chat and link the saved report. Status rules: `.cursor/rules/schedule-engine.mdc`.
 
-## Six deliverables (report order)
+## Three deliverables (report order)
 
-Executive summary → **Delivery items (Epics)** → **Teams plan** → **Member breakdown** → **Execution stages** → **Bug fix effort** → **Team tasks plan** → Data quality flags → Recommended actions (→ Schedule Delta when a prior snapshot exists).
+Executive summary → **Delivery items (Epics)** → **Epic Quality Report** (summary table only).
 
-- **Delivery items:** Start = earliest child `startDate`, Due = latest child `dueDate`, Status = worst child (blocked > delayed > at_risk > on_track), TBD if unscheduled. Sorted by Jira **Rank** (LexoRank / board order, `fields.rank`). Title links to the epic's PRD block in Timeline breakdown (`#prd-{epicKey}`).
-- **Teams plan / Member breakdown / Execution stages:** effort is **Task + Sub-task only** (bugs excluded), 6h/day (`timeline.hoursPerDay`). `Calc days = (Efforts + Leave) / (Resources × 6h)` as decimal person-days (e.g. 3h → 0.5). Stage/member `Leave (h)` combines planned + unplanned. Platforms with no Jira tasks are omitted. Calendar dates are **deferred** — there are no Start/End columns (sprint-window date rule to be added later).
-- **Bug fix effort:** Jira **Bug** issues, worklog **time spent**; columns Backend / Web / Mobile / QA / Other / **Total** / Bugs — each bug counts once on its team's side and the columns reconcile to Total. Per-epic member tables (Member, Bug effort, Bug count).
-- **Team tasks plan:** per-assignee scheduled tasks (Key, Task title, Epic, Effort, Status); dates are engine-calculated.
-- **Data quality flags:** reason summary table + one consolidated row per ticket. Tasks/sub-tasks flag `Missing estimates`; bugs in active statuses (`dataQuality.bugActiveStatuses`) skip time flags; `bugNoWorklogStatuses` (Not a Bug) skip worklog checks; other resolved bugs need worklog or get `Missing logged time`.
-- **Jira links:** every issue key renders as a browse link from `jira.siteUrl` (or `--jira-site-url`) — Delivery items, Timeline (headings, Issues column, unmapped), Bug fix effort, Team tasks plan, Data quality, Schedule Delta, and `--standup` output. Member **Issues** lists all keys (no truncation). When summarizing sprint health in chat, link keys the same way (`[VP-123]({siteUrl}/browse/VP-123)`).
+- **Delivery items:** Shows start and end dates for Backend, Web, and Mobile deliveries, along with the Final Release date (calculated from child stages). Sorted by Jira **Rank** (LexoRank / board order, `fields.rank`).
+- **Epic Quality Report:** Jira **Bug** issues, worklog **time spent**; columns: Epic ID / Epic Name / Bugs / Backend / Web / Mobile / Other / Total — each bug counts once on its team's side and the columns reconcile to Total. The `Bugs` column displays the total count of bug tickets in scope. No detailed member bug breakdowns or individual task sub-tables are included.
+- **Jira links:** every issue key renders as a browse link from `jira.siteUrl` (or `--jira-site-url`) — Delivery items, Epic Quality Report, and `--standup` output. When summarizing sprint health in chat, link keys the same way (`[VP-123]({siteUrl}/browse/VP-123)`).
 
 ## Schedule engine I/O (per assignee)
 

@@ -31,7 +31,7 @@ from sprintkit.timeline import side_display, format_calc_days
 
 STATUS_RANK = {"blocked": 0, "delayed": 1, "at_risk": 2, "on_track": 3, "tbd": 4}
 SCHEDULE_TEAM_ORDER = ("Backend", "Web", "Mobile", "QA", "Other")
-BUG_FIX_SIDE_COLUMNS = ("Backend", "Web", "Mobile", "QA", "Other")
+BUG_FIX_SIDE_COLUMNS = ("Backend", "Web", "Mobile", "Other")
 TEAM_PLAN_ORDER = (
     "Backend",
     "Data Engineering",
@@ -196,6 +196,25 @@ def render_executive_summary(
     return lines
 
 
+def get_platform_delivery_dates(
+    epic_row: dict[str, Any] | None, platform_key: str
+) -> tuple[str | None, str | None]:
+    if not epic_row:
+        return None, None
+    block = (epic_row.get("executionStages") or {}).get(platform_key) or {}
+    stages = block.get("stages") or []
+    starts = []
+    ends = []
+    for stage_row in stages:
+        s = stage_row.get("start")
+        e = stage_row.get("end")
+        if s:
+            starts.append(s)
+        if e:
+            ends.append(e)
+    return (min(starts) if starts else None, max(ends) if ends else None)
+
+
 def render_delivery_items(
     ordered_epic_keys: list[str],
     issues: list[dict],
@@ -206,6 +225,7 @@ def render_delivery_items(
     timeline_epic_keys: set[str],
     jira_site_url: str | None,
     config: dict[str, Any] | None,
+    timeline: list[dict[str, Any]] | None = None,
 ) -> list[str]:
     from sprintkit.jira_model import is_epic_issue
 
@@ -217,10 +237,10 @@ def render_delivery_items(
         )
         lines.append("")
     lines.append(
-        "| Epic | Title | Start | Due | Phase | Status | Scheduled tasks | Unscheduled |"
+        "| Epic | Title | Backend | Web | Mobile | Final Release |"
     )
     lines.append(
-        "|------|-------|-------|-----|-------|--------|-----------------|-------------|"
+        "|------|-------|---------|-----|--------|---------------|"
     )
 
     for epic_key in ordered_epic_keys:
@@ -233,13 +253,31 @@ def render_delivery_items(
         )
         epic_link = jira_issue_link(jira_site_url, epic_key)
         rollup = compute_epic_rollup(epic_key, scheduled, unscheduled, engine_items)
-        phase = phase_for_epic(epic_key, issues, config)
-        start_s = rollup["start"] or "TBD"
-        due_s = rollup["due"] or "TBD"
-        status_s = rollup["status"] if rollup["status"] != "tbd" else "TBD"
+
+        backend_s = "—"
+        web_s = "—"
+        mobile_s = "—"
+        final_release_s = "—"
+
+        epic_row = next((e for e in (timeline or []) if e.get("epicKey") == epic_key), None)
+        if epic_row:
+            b_start, b_end = get_platform_delivery_dates(epic_row, "backend")
+            w_start, w_end = get_platform_delivery_dates(epic_row, "frontend")
+            m_start, m_end = get_platform_delivery_dates(epic_row, "mobile")
+
+            if b_start and b_end:
+                backend_s = f"{b_start} → {b_end}"
+            if w_start and w_end:
+                web_s = f"{w_start} → {w_end}"
+            if m_start and m_end:
+                mobile_s = f"{m_start} → {m_end}"
+
+            go_live = epic_row.get("goLive")
+            if go_live:
+                final_release_s = go_live
+
         lines.append(
-            f"| {epic_link} | {title_cell} | {start_s} | {due_s} | {phase} | {status_s} "
-            f"| {rollup['scheduled_count']} | {rollup['unscheduled_count']} |"
+            f"| {epic_link} | {title_cell} | {backend_s} | {web_s} | {mobile_s} | {final_release_s} |"
         )
 
     lines.append("")
@@ -390,7 +428,7 @@ def render_timeline_sections(
     return lines
 
 
-def render_bug_sections(
+def render_epic_quality_report(
     bug_data: list[dict[str, Any]],
     jira_site_url: str | None,
 ) -> list[str]:
@@ -400,13 +438,13 @@ def render_bug_sections(
     header_sides = " | ".join(BUG_FIX_SIDE_COLUMNS)
     sep_sides = "|".join(["-----"] * len(BUG_FIX_SIDE_COLUMNS))
     lines = [
-        "## Bug fix effort",
+        "## Epic Quality Report",
         "",
         "Jira **Bug** issues — worklog **time spent** (h) by epic and team side. "
         "Each bug counts once on its team's side; columns reconcile to **Total**.",
         "",
-        f"| Epic ID | Epic Name | {header_sides} | Total | Bugs |",
-        f"|---------|-----------|{sep_sides}|-------|------|",
+        f"| Epic ID | Epic Name | Bugs | {header_sides} | Total |",
+        f"|---------|-----------|------|{sep_sides}|-------|",
     ]
 
     col_totals = {col: 0.0 for col in BUG_FIX_SIDE_COLUMNS}
@@ -425,7 +463,7 @@ def render_bug_sections(
         grand_total += total or 0
         bug_n = epic.get("bugCount", 0)
         lines.append(
-            f"| {epic_id} | {prd} | {' | '.join(cells)} | {fmt_hours(total)} | {bug_n} |"
+            f"| {epic_id} | {prd} | {bug_n} | {' | '.join(cells)} | {fmt_hours(total)} |"
         )
 
     lines.append("")
@@ -436,30 +474,6 @@ def render_bug_sections(
         f"**Sprint bug effort total:** {fmt_hours(round(grand_total, 1))} h ({side_summary})"
     )
     lines.append("")
-
-    for epic in bug_data:
-        epic_key = epic.get("epicKey", "")
-        prd = escape_md_cell(epic.get("prdName") or epic_key)
-        epic_link = jira_issue_link(jira_site_url, epic_key)
-        members = epic.get("members") or []
-        bug_n = epic.get("bugCount", 0)
-        if not members and bug_n == 0:
-            continue
-        lines.append(f"### {epic_link} — {prd}")
-        if not members and bug_n > 0:
-            lines.append("")
-            lines.append(f"_{bug_n} bugs in scope; no worklog time logged yet._")
-            lines.append("")
-            continue
-        lines.append("")
-        lines.append("| Member | Bug effort (h) | Bug count |")
-        lines.append("|--------|----------------|-----------|")
-        for m in members:
-            lines.append(
-                f"| {escape_md_cell(m.get('member', ''))} | "
-                f"{fmt_hours(m.get('effortsHours'))} | {m.get('bugCount', 0)} |"
-            )
-        lines.append("")
 
     return lines
 

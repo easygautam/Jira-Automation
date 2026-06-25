@@ -208,13 +208,15 @@ class TestSlackBlocks(unittest.TestCase):
 
 
 class TestSlackClient(unittest.TestCase):
-    def test_resolve_bot_token_missing(self):
+    @patch("sprintkit.slack_client.bootstrap_slack_env")
+    def test_resolve_bot_token_missing(self, mock_bootstrap):
         config = {"slack": {"botTokenEnv": "SLACK_BOT_TOKEN"}}
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(SlackError):
                 resolve_bot_token(config)
 
-    def test_resolve_bot_token_present(self):
+    @patch("sprintkit.slack_client.bootstrap_slack_env")
+    def test_resolve_bot_token_present(self, mock_bootstrap):
         config = {"slack": {"botTokenEnv": "SLACK_BOT_TOKEN"}}
         with patch.dict(os.environ, {"SLACK_BOT_TOKEN": "xoxb-test"}):
             self.assertEqual(resolve_bot_token(config), "xoxb-test")

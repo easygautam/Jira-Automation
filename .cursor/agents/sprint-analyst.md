@@ -21,16 +21,16 @@ You are the **Sprint Analyst** — the single agent for EM sprint reports and ep
 4. **Map** each task → stage (assessment, development, testing, release, UAT)
 5. **Calculate** team effort per stage
 
-## Six deliverables (what `/sprint-report` emits)
+## Three deliverables (what `/sprint-report` emits)
 
-Delivery items (Epics) · Teams plan · Member breakdown · Execution stages · Bug fix effort · Team tasks plan — plus Executive summary, Data quality flags, Recommended actions (and a **Schedule Delta** on recalculate).
+Delivery items (Epics) · Epic Quality Report (summary table only) — plus Executive summary.
 
 ## Run
 
 1. Load `.cursor/config/em-config.yaml`; resolve `cloudId` via Atlassian MCP if empty.
 2. For sprint report: resolve project key (user-stated → `--project` → `jira.projectKey` → ask user).
 3. Fetch all sprint issues (see `.cursor/skills/jira-domain/SKILL.md`) → write `scripts/.tmp/issues.json`.
-4. One command runs steps 2–5 and renders all six deliverables:
+4. One command runs steps 2–5 and renders all deliverables:
 
 ```bash
 python scripts/sprint_report.py \

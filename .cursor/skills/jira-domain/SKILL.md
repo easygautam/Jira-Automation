@@ -22,7 +22,7 @@ Epic (priority source) → Story → Task / Sub-task (estimate + assignee). Walk
 | Epic | Delivery item (PRD) |
 | Story | Independently releasable slice |
 | Task / Sub-task | Execution; estimates on `timeoriginalestimate`, summed per assignee per story |
-| Bug | Schedulable via `effective_estimate_seconds` (`timespent` if &gt; 0, else OE); **Bug fix effort** report uses `timespent` only; **DQ:** bugs in active statuses (`dataQuality.bugActiveStatuses`) skip time flags; `bugNoWorklogStatuses` (e.g. Not a Bug) skip worklog checks; other bugs must have worklog or get `Missing logged time` |
+| Bug | Schedulable via `effective_estimate_seconds` (`timespent` if &gt; 0, else OE); **Epic Quality Report** uses `timespent` only; **DQ:** bugs in active statuses (`dataQuality.bugActiveStatuses`) skip time flags; `bugNoWorklogStatuses` (e.g. Not a Bug) skip worklog checks; other bugs must have worklog or get `Missing logged time` |
 
 Task effective priority = Epic priority (`priorityOrder` in config). Flag missing estimates before scheduling.
 

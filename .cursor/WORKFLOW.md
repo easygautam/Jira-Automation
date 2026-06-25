@@ -100,6 +100,7 @@ Team prefixes: `sprintkit/teams.py` + `em-config.yaml` `teamPrefixMapping` (firs
 - Agent: `.cursor/agents/sprint-analyst.md`
 - Skills: `sprint-report` (runbook), `epic-estimation`, `epic-estimation-send-slack`, `jira-domain`, `delivery-flow`, `improve-workflow`
 
-## Six deliverables (report order)
+## Three deliverables (report order)
 
-Executive summary → **Delivery items (Epics)** → **Teams plan** → **Member breakdown** → **Execution stages** → **Bug fix effort** (epic × Backend/Web/Mobile/QA/Other/Total + member detail) → **Team tasks plan** → Data quality flags → Recommended actions (→ Schedule Delta on `--recalc`).
+Executive summary → **Delivery items (Epics)** → **Epic Quality Report** (summary table only).
+
