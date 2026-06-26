@@ -5,7 +5,6 @@ import {
   CardHeader,
   Divider,
   H1,
-  H2,
   H3,
   Link,
   Row,
@@ -99,13 +98,44 @@ function issueLink(key: string): string {
   return base ? `${base}/browse/${key}` : `#${key}`;
 }
 
+const MD_LINK_RE = /\[([^\]]+)\]\(([^)]+)\)/g;
+
+function renderMarkdownLinks(text: string) {
+  const parts: Array<string | JSX.Element> = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  const re = new RegExp(MD_LINK_RE.source, MD_LINK_RE.flags);
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > last) {
+      parts.push(text.slice(last, match.index));
+    }
+    parts.push(
+      <Link key={`${match.index}-${match[1]}`} href={match[2]}>
+        {match[1]}
+      </Link>,
+    );
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) {
+    parts.push(text.slice(last));
+  }
+  if (parts.length === 0) {
+    return text;
+  }
+  return (
+    <Text as="span" style={{ whiteSpace: "pre-wrap" }}>
+      {parts}
+    </Text>
+  );
+}
+
 function ColumnStripeTable({
   headers,
   rows,
   theme,
 }: {
   headers: string[];
-  rows: (string | number | null | undefined)[][];
+  rows: (string | number | null | undefined | JSX.Element)[][];
   theme: CanvasHostTheme;
 }) {
   const cellPad = "8px 12px";
@@ -185,6 +215,7 @@ export default function EpicEstimationCanvas() {
   const theme = useHostTheme();
   const d = EPIC_DATA;
   const windowCaption = deliveryWindowCaption(d.deliveryStart, d.goLive);
+  const additionalEfforts = d.additionalEfforts ?? [];
 
   return (
     <Stack gap={24} style={{ padding: 24, color: theme.text.primary }}>
@@ -261,6 +292,23 @@ export default function EpicEstimationCanvas() {
         </Card>
       ) : null}
 
+      {additionalEfforts.length > 0 ? (
+        <Card>
+          <CardHeader>Additional efforts</CardHeader>
+          <CardBody style={{ padding: 0 }}>
+            <ColumnStripeTable
+              theme={theme}
+              headers={["Team", "Effort (h)", "Details"]}
+              rows={additionalEfforts.map((row) => [
+                row.team,
+                fmtNum(row.effortHours),
+                row.details ? renderMarkdownLinks(row.details) : "—",
+              ])}
+            />
+          </CardBody>
+        </Card>
+      ) : null}
+
       {d.platforms.map((plat) => (
         <Card>
           <CardHeader>{platformDeliveryTitle(plat.platform)}</CardHeader>
@@ -308,17 +356,6 @@ export default function EpicEstimationCanvas() {
             />
           </CardBody>
         </Card>
-      ) : null}
-
-      {d.unmapped.length > 0 ? (
-        <Stack gap={8}>
-          <H2>Unmapped work</H2>
-          {d.unmapped.map((u) => (
-            <Text>
-              <Link href={issueLink(u.key)}>{u.key}</Link>: {u.summary} ({u.effortsHours}h)
-            </Text>
-          ))}
-        </Stack>
       ) : null}
 
       {d.dataQuality.length > 0 ? (

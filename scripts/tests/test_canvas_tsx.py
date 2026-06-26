@@ -45,6 +45,20 @@ class TestCanvasTsx(unittest.TestCase):
         self.assertIn("VP-800", content)
         path.unlink(missing_ok=True)
 
+    def test_additional_efforts_section_when_present(self):
+        canvas = dict(self.result.canvas_data)
+        canvas["additionalEfforts"] = [
+            {
+                "team": "QA",
+                "effortHours": 2,
+                "details": "Alice (2h) - [VP-999](https://example.atlassian.net/browse/VP-999)",
+            },
+        ]
+        text = render_epic_canvas_tsx(canvas)
+        self.assertIn("Additional efforts", text)
+        self.assertIn("renderMarkdownLinks(row.details)", text)
+        self.assertNotIn("Unmapped work", text)
+
 
 if __name__ == "__main__":
     unittest.main()
