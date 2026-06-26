@@ -9,6 +9,6 @@ Modules map to the five-step process:
 5. Calculate efforts/stage   -> timeline.py
 
 Scheduling (normalize.py + schedule.py), bug effort (bugs.py), data quality
-(quality.py), and rendering (render/) build the six report deliverables, wired
+(quality.py), and rendering (render/) build the three report sections, wired
 together by pipeline.py and exposed through scripts/sprint_report.py.
 """

@@ -1,80 +1,62 @@
 ---
 name: epic-estimation
 description: >-
-  Runbook for epic delivery estimation: fetch all issues under one Epic (no sprint
-  filter), map platform/team/stage effort, compute stage Start/End dates, display in
-  a Cursor Canvas beside chat. Use for /epic-estimation. Never writes a report file.
+  Epic delivery estimation: MCP fetch, run_epic_estimation wrapper, scripted canvas.
+  Use for /epic-estimation. Never writes under reports/.
 disable-model-invocation: true
 ---
 
 # Epic Estimation
 
-One agent (`sprint-analyst`) drives epic estimation. The pipeline (`scripts/epic_estimation.py` → `scripts/sprintkit/`) owns effort mapping and stage date math; never hand-compute dates in prose.
-
-**Output:** Cursor Canvas beside chat only — **never** save under `reports/`.
+**Output:** Cursor Canvas + chat summary — **never** `reports/`.
 
 ## Protocol
 
 ```
-PLAN → FETCH → RUN → DISPLAY
+PLAN → FETCH → RUN → REPORT
 ```
 
 ### PLAN
 
-1. Read `.cursor/config/em-config.yaml`.
-2. Require **Epic key** from the user (e.g. `ABC-12345`). Project is derived from the epic key — do not ask for project.
-3. Resolve `cloudId` via Atlassian MCP if empty.
+1. Read `.cursor/config/em-config.yaml`
+2. Require **Epic key** from user (e.g. `ABC-12345`). Project from epic key — do not ask for project.
 
-### FETCH — epic issue tree (no sprint filter)
+### FETCH
 
-Follow `.cursor/skills/jira-domain/SKILL.md` epic-scope rules:
-
-1. `getAccessibleAtlassianResources` when `cloudId` empty.
-2. Discover Start date field if needed → `fields.startDate` in config.
-3. **Pass 1** — `searchJiraIssuesUsingJql` with `epicEstimation.epicScopeJql` (substitute `{epicKey}` only).
-4. **Pass 2** — fetch tasks/sub-tasks under stories: `epicEstimation.taskScopeJql` with `{parentKeys}` = story keys from pass 1.
-5. **Pass 3** — fetch sub-tasks under tasks: `epicEstimation.subtaskScopeJql` with `{taskKeys}` = Task keys from passes 1–2 (exclude Epic/Story).
-6. Fields: sprint fetch set **plus** `duedate`, `fields.startDate`, `fields.teams`.
-7. Merge + dedupe → `scripts/.tmp/epic-{epicKey}-issues.json`.
+Follow `.cursor/skills/_shared/jira-fetch-epic.md`.
 
 ### RUN
 
 ```bash
-python scripts/epic_estimation.py \
+python scripts/run_epic_estimation.py \
   --epic {epicKey} \
   --issues scripts/.tmp/epic-{epicKey}-issues.json \
   --config .cursor/config/em-config.yaml
 ```
 
-Stdout is a single JSON object (`epicKey`, `deliveryStart`, `goLive`, `timeline`, `canvas`, `markdown`, `warnings`, `unmappedCount`). Optional `--tmp-dir scripts/.tmp` writes debug JSON only.
+Writes canvas via `--write-canvas` (default Cursor canvases dir). Prints `--summary-only` text.
 
-### DISPLAY
+Low-level CLI (debug): `scripts/epic_estimation.py` with `--write-canvas` and JSON stdout.
 
-1. Parse stdout JSON.
-2. Write/update `~/.cursor/projects/Users-easygautam-Documents-Sprint-Automation/canvases/epic-{epicKey}.canvas.tsx` — embed the `canvas` object inline (see canvas skill).
-3. **Do not** call MCP `open_resource` to open the canvas — it can hang. Instead, include a markdown link to the `.canvas.tsx` file and tell the user to click it to open beside chat.
-4. Brief chat summary: delivery start, go-live, unmapped count, top warnings.
+### REPORT
 
-**Do not** write `reports/*.md` or use `--output`.
+Follow `.cursor/skills/_shared/post-run.md`.
 
 ## Stage date rules
 
-| Stage | Start | End |
-|-------|-------|-----|
-| Tech Solutioning | Earliest Jira Start among stage tasks **and Task/Story parents** (not Epic); none → `—` | `add_business_days(start, max days)` |
-| Development | Earliest Jira Start among dev tasks + Task/Story parents; Web/Mobile ≥ BE dev end | same |
-| Other stages | `next_workday(prior_stage_end)` when stage has tasks or effort; no tasks/effort → `—` | same |
-
-**Stage max days** = longest assignee load on that stage (max of effort ÷ 6h per person). Synthetic buffers (Bug fixes, Stage final testing) use aggregate formula. **Member calc days** = that member's total effort ÷ 6h.
-
-Effort: `build_timeline_breakdown` (6h/day, Task/Sub-task only). Details: `delivery-flow` skill.
+See `delivery-flow` skill and `scripts/sprintkit/stage_dates.py`.
 
 ## Dry-run (no Jira)
 
-Use fixture issues and pass `--jira-site-url https://example.atlassian.net`.
+```bash
+python scripts/run_epic_estimation.py \
+  --epic VP-800 \
+  --issues scripts/tests/fixtures/epic_cli_issues.json
+```
 
-## Related skills
+(Use fixture path for `--issues`.)
 
-- `jira-domain` — hierarchy, epic JQL, Start date field
+## Related
+
+- `jira-domain` — hierarchy, epic JQL
 - `delivery-flow` — stage order, BE→Web/Mobile dependency
-- `canvas` — canvas authoring rules

@@ -84,10 +84,15 @@ def run_epic_estimation(
     )
 
 
-def result_to_json(result: EpicEstimationResult) -> dict[str, Any]:
+def result_to_json(
+    result: EpicEstimationResult,
+    *,
+    summary: str | None = None,
+    canvas_path: str | None = None,
+) -> dict[str, Any]:
     """Serialize for CLI stdout."""
     dq_counts = count_dq_reasons(result.data_quality)
-    return {
+    payload: dict[str, Any] = {
         "epicKey": result.epic_key,
         "prdName": result.prd_name,
         "deliveryStart": result.delivery_start,
@@ -100,3 +105,8 @@ def result_to_json(result: EpicEstimationResult) -> dict[str, Any]:
         "unmappedCount": result.unmapped_count,
         "dataQualityCounts": dq_counts,
     }
+    if summary is not None:
+        payload["summary"] = summary
+    if canvas_path is not None:
+        payload["canvasPath"] = canvas_path
+    return payload

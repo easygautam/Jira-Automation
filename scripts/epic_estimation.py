@@ -10,21 +10,31 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from sprintkit.cli_common import (  # noqa: E402
+    default_canvas_path,
+    load_issues,
+    resolve_config_path,
+    write_json,
+)
 from sprintkit.config import load_config  # noqa: E402
+from sprintkit.env_loader import find_repo_root  # noqa: E402
 from sprintkit.epic_pipeline import result_to_json, run_epic_estimation  # noqa: E402
+from sprintkit.render.canvas_tsx import write_epic_canvas  # noqa: E402
+from sprintkit.render.summary import epic_estimation_summary  # noqa: E402
 
 
-def _load_issues(path: str) -> list[dict]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    return payload if isinstance(payload, list) else payload.get("issues", payload)
+def _add_write_canvas_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--write-canvas",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="PATH",
+        help="Write Cursor canvas .tsx (default path when flag has no value)",
+    )
 
 
-def _write_json(path: Path, data) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-
-
-def main() -> None:
+def run_epic_cli(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Epic estimation (stdout JSON; no report file)")
     parser.add_argument("--epic", required=True, help="Epic issue key (e.g. ABC-12345)")
     parser.add_argument("--issues", default="scripts/.tmp/issues.json")
@@ -35,31 +45,57 @@ def main() -> None:
         default=None,
         help="Optional debug snapshot directory (not a user deliverable)",
     )
-    args = parser.parse_args()
+    _add_write_canvas_arg(parser)
+    parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Print summary text to stdout instead of JSON",
+    )
+    args = parser.parse_args(argv)
 
-    config = load_config(Path(args.config))
-    issues = _load_issues(args.issues)
+    repo_root = find_repo_root()
+    config = load_config(resolve_config_path(args.config, repo_root=repo_root))
+    issues = load_issues(args.issues)
     jira_site_url = args.jira_site_url or (config.get("jira") or {}).get("siteUrl")
+    epic_key = args.epic.upper()
 
     try:
         result = run_epic_estimation(
             issues,
             config,
-            args.epic.upper(),
+            epic_key,
             jira_site_url=jira_site_url,
         )
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
-        sys.exit(1)
+        return 1
 
-    payload = result_to_json(result)
+    canvas_path: Path | None = None
+    if args.write_canvas is not None:
+        canvas_path = (
+            Path(args.write_canvas)
+            if args.write_canvas
+            else default_canvas_path(epic_key, config, repo_root=repo_root)
+        )
+        write_epic_canvas(result.canvas_data, canvas_path)
+
+    summary = epic_estimation_summary(result, canvas_path=canvas_path)
+    payload = result_to_json(result, summary=summary, canvas_path=str(canvas_path) if canvas_path else None)
 
     if args.tmp_dir:
-        tmp = Path(args.tmp_dir)
-        _write_json(tmp / f"epic-{args.epic.upper()}-timeline.json", payload["timeline"])
+        write_json(Path(args.tmp_dir) / f"epic-{epic_key}-timeline.json", payload["timeline"])
+
+    if args.summary_only:
+        sys.stdout.write(summary)
+        return 0
 
     json.dump(payload, sys.stdout, indent=2)
     sys.stdout.write("\n")
+    return 0
+
+
+def main() -> None:
+    raise SystemExit(run_epic_cli())
 
 
 if __name__ == "__main__":

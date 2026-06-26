@@ -76,6 +76,10 @@ reporting:
   filenamePattern: sprint-{date}.md
   prdTitleSuffix: PRD   # Title suffix for PRD epics (display only; sort uses Jira Rank)
 
+workflow:
+  # Optional override for epic canvas output (default: ~/.cursor/projects/<workspace>/canvases/)
+  # canvasDir: ~/.cursor/projects/Users-easygautam-Documents-Sprint-Automation/canvases
+
 slack:
   channel: gautam-personal-agent
   botTokenEnv: SLACK_BOT_TOKEN

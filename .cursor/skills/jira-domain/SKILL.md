@@ -56,11 +56,11 @@ Write merged issues to `scripts/.tmp/epic-{epicKey}-issues.json`. Include `field
 
 ## MCP fetch (sprint)
 
-1. `getAccessibleAtlassianResources` if `cloudId` empty
-2. Discover Sprint field via `getJiraIssueTypeMetaWithFields` if needed → `fields.sprint` in config
-3. `searchJiraIssuesUsingJql` paginated (`maxResults=100`, `nextPageToken`)
-4. Fields: `summary, status, assignee, priority, issuetype, parent, timeoriginalestimate, timespent, created, updated, resolutiondate, labels, components, duedate, {fields.sprint}, {fields.rank}, {fields.startDate}, {fields.teams}` (see `fields` in config)
-5. Write `scripts/.tmp/issues.json`; the pipeline derives the active sprint window (`scripts/sprintkit/sprint_window.py`) — do not infer sprint dates
+Procedural steps: `.cursor/skills/_shared/jira-fetch-sprint.md`.
+
+Epic fetch: `.cursor/skills/_shared/jira-fetch-epic.md`.
+
+Field list and JQL templates remain below for reference.
 
 ## Leave tasks (timeline)
 

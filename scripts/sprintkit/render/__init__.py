@@ -1,1 +1,1 @@
-"""Markdown rendering for the sprint report (the six deliverables)."""
+"""Markdown rendering for the sprint report (three sections)."""

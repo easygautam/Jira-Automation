@@ -27,7 +27,8 @@ System inventory and pipeline: **`.cursor/WORKFLOW.md`**. Runbook: **`sprint-rep
 | Jira field mapping | `em-config.yaml`, `jira-domain`, `sprintkit/normalize.py`, `sprintkit/sprint_window.py` |
 | Sprint window / epic rollup | `sprintkit/sprint_window.py`, `sprintkit/render/sections.py`, `sprint-report` |
 | Timeline / bug sections | `sprintkit/timeline.py`, `sprintkit/bugs.py`, `sprintkit/render/sections.py`, `sprint-report` |
-| MCP fetch protocol | `jira-domain`, `sprint-report` skill, `sprint-analyst` agent |
+| MCP fetch protocol | `_shared/jira-fetch-*.md`, `jira-domain`, `sprint-analyst` |
+| Wrapper scripts / canvas | `cli_common.py`, `render/canvas_tsx.py`, `render/summary.py`, `run_*.py`, WORKFLOW.md, epic skills |
 
 ## Workflow
 

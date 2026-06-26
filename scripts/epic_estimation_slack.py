@@ -10,25 +10,24 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from epic_estimation import _add_write_canvas_arg, run_epic_cli  # noqa: E402
+from sprintkit.cli_common import (  # noqa: E402
+    default_canvas_path,
+    load_issues,
+    resolve_config_path,
+    write_json,
+)
 from sprintkit.config import load_config  # noqa: E402
 from sprintkit.env_loader import find_repo_root  # noqa: E402
 from sprintkit.epic_pipeline import result_to_json, run_epic_estimation  # noqa: E402
+from sprintkit.render.canvas_tsx import write_epic_canvas  # noqa: E402
 from sprintkit.render.slack_blocks import build_slack_blocks  # noqa: E402
+from sprintkit.render.summary import epic_estimation_summary  # noqa: E402
 from sprintkit.slack_client import (  # noqa: E402
     SlackError,
     check_slack_setup,
     post_epic_estimation,
 )
-
-
-def _load_issues(path: str) -> list[dict]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    return payload if isinstance(payload, list) else payload.get("issues", payload)
-
-
-def _write_json(path: Path, data) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> None:
@@ -44,6 +43,12 @@ def main() -> None:
         default=None,
         help="Optional debug snapshot directory (not a user deliverable)",
     )
+    _add_write_canvas_arg(parser)
+    parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Print summary text to stdout instead of JSON",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -56,10 +61,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    repo_root = find_repo_root(Path(__file__).resolve().parents[1])
-    config_path = Path(args.config)
-    if not config_path.is_absolute():
-        config_path = repo_root / config_path
+    repo_root = find_repo_root()
+    config_path = resolve_config_path(args.config, repo_root=repo_root)
     config = load_config(config_path)
 
     if args.check_slack:
@@ -75,39 +78,68 @@ def main() -> None:
     if not args.epic:
         parser.error("--epic is required unless using --check-slack")
 
-    issues = _load_issues(args.issues)
+    issues = load_issues(args.issues)
     jira_site_url = args.jira_site_url or (config.get("jira") or {}).get("siteUrl")
+    epic_key = args.epic.upper()
 
     try:
         result = run_epic_estimation(
             issues,
             config,
-            args.epic.upper(),
+            epic_key,
             jira_site_url=jira_site_url,
         )
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(1)
 
-    payload = result_to_json(result)
+    canvas_path: Path | None = None
+    if args.write_canvas is not None:
+        canvas_path = (
+            Path(args.write_canvas)
+            if args.write_canvas
+            else default_canvas_path(epic_key, config, repo_root=repo_root)
+        )
+        write_epic_canvas(result.canvas_data, canvas_path)
 
-    if args.tmp_dir:
-        tmp = Path(args.tmp_dir)
-        _write_json(tmp / f"epic-{args.epic.upper()}-timeline.json", payload["timeline"])
+    slack_permalink: str | None = None
+    slack_result: dict | None = None
 
     if args.dry_run:
         slack_payload = build_slack_blocks(result.canvas_data)
-        json.dump({"epic": payload, "slack": slack_payload}, sys.stdout, indent=2)
+        summary = epic_estimation_summary(result, canvas_path=canvas_path)
+        payload = result_to_json(
+            result, summary=summary, canvas_path=str(canvas_path) if canvas_path else None
+        )
+        payload["slack"] = slack_payload
+        json.dump(payload, sys.stdout, indent=2)
         sys.stdout.write("\n")
         return
 
     try:
         slack_result = post_epic_estimation(result.canvas_data, config)
+        slack_permalink = slack_result.get("permalink")
     except SlackError as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(1)
 
+    summary = epic_estimation_summary(
+        result,
+        canvas_path=canvas_path,
+        slack_permalink=slack_permalink,
+    )
+    payload = result_to_json(
+        result, summary=summary, canvas_path=str(canvas_path) if canvas_path else None
+    )
     payload["slack"] = slack_result
+
+    if args.tmp_dir:
+        write_json(Path(args.tmp_dir) / f"epic-{epic_key}-timeline.json", payload["timeline"])
+
+    if args.summary_only:
+        sys.stdout.write(summary)
+        return
+
     json.dump(payload, sys.stdout, indent=2)
     sys.stdout.write("\n")
 

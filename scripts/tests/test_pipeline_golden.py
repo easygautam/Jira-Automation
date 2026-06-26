@@ -1,6 +1,6 @@
 """Golden end-to-end test: run the whole pipeline on a small fixture.
 
-Validates that all six report deliverables render, the post-refactor fixes hold
+Validates that all three report sections render, the post-refactor fixes hold
 (reconciled Bug fix effort columns, no Start/End columns, blank line before
 Unmapped work), and the active sprint window is resolved from the Jira field.
 """
