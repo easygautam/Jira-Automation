@@ -13,13 +13,16 @@ from typing import Any
 
 from sprintkit.jira_model import (
     assignee_name,
+    build_index,
     epic_summary,
     get_field,
     is_bug_issue,
     is_epic_issue,
     is_task_or_subtask,
+    issue_type_name,
     resolve_epic_key,
     sort_epic_keys,
+    task_has_subtasks,
 )
 from sprintkit.config import DEFAULT_SIDE_DISPLAY, resolve_side_display_map
 from sprintkit.stages import (
@@ -68,6 +71,8 @@ def member_side_for_classification(
     kind = classification.get("kind")
     if kind == "unmapped":
         return side_display(TEAM_OTHER, side_display_map)
+    if kind == "additional_effort":
+        return side_display(classification.get("team") or "qa", side_display_map)
     if kind == "leave":
         return side_display(classification.get("team") or TEAM_OTHER, side_display_map)
     work_team = classification.get("team") or classification.get("platform")
@@ -76,6 +81,30 @@ def member_side_for_classification(
     if work_team == TEAM_PRODUCT_DESIGN:
         return side_display(TEAM_PRODUCT_DESIGN, side_display_map)
     return side_display(work_team or TEAM_OTHER, side_display_map)
+
+
+_ADDITIONAL_EFFORT_TEAMS = frozenset(
+    {
+        "backend",
+        "frontend",
+        "mobile",
+        "qa",
+        "data_engineering",
+        "devops",
+        TEAM_PRODUCT_DESIGN,
+    }
+)
+
+
+def additional_effort_team_side(
+    classification: dict[str, Any],
+    side_display_map: dict[str, str],
+) -> str:
+    """Display team for Additional efforts table (inferred team when known)."""
+    team = classification.get("team")
+    if team in _ADDITIONAL_EFFORT_TEAMS:
+        return side_display(team, side_display_map)
+    return side_display(TEAM_OTHER, side_display_map)
 
 
 def check_timeline_team_consistency(timeline: list[dict[str, Any]]) -> list[str]:
@@ -107,6 +136,26 @@ def check_timeline_team_consistency(timeline: list[dict[str, Any]]) -> list[str]
                 )
                 break
     return warnings
+
+
+def stage_max_days(bucket: dict[str, Any], hours_per_day: float) -> float | None:
+    """Stage duration = max person-days across assignees; synthetic stages use aggregate."""
+    member_hours = bucket.get("memberHours") or {}
+    if member_hours:
+        days = [round(h / hours_per_day, 2) for h in member_hours.values() if h > 0]
+        if days:
+            return max(days)
+    resource_count = len(bucket["resources"])
+    resources = float(resource_count) if resource_count else 0.0
+    if resources <= 0 and bucket["effortsHours"] > 0:
+        resources = 1.0
+    return calc_days(
+        bucket["effortsHours"],
+        bucket["plannedLeaveHours"],
+        bucket["unplannedDelayHours"],
+        resources,
+        hours_per_day,
+    )
 
 
 def calc_days(
@@ -212,6 +261,7 @@ def _empty_stage_bucket() -> dict[str, Any]:
         "unplannedDelayHours": 0.0,
         "resources": set(),
         "issueKeys": [],
+        "memberHours": {},
         "source": None,
     }
 
@@ -252,13 +302,7 @@ def _stage_to_row(
     # Synthetic buffers (e.g. Bug fixes) have effort but no assignees — assume 1 resource.
     if resources <= 0 and bucket["effortsHours"] > 0:
         resources = 1.0
-    calc = calc_days(
-        bucket["effortsHours"],
-        bucket["plannedLeaveHours"],
-        bucket["unplannedDelayHours"],
-        resources,
-        hours_per_day,
-    )
+    calc = stage_max_days(bucket, hours_per_day)
     return {
         "stage": stage_name,
         "source": bucket.get("source") or ("jira" if bucket["issueKeys"] else None),
@@ -342,6 +386,8 @@ def build_timeline_breakdown(
         member_stats: dict[tuple[str, str], dict[str, Any]] = {}
         unmapped: list[dict[str, Any]] = []
 
+        epic_index = build_index(epic_issues)
+
         for issue in epic_issues:
             if is_epic_issue(issue):
                 continue
@@ -350,6 +396,12 @@ def build_timeline_breakdown(
             if not is_task_or_subtask(issue):
                 continue
             key = issue.get("key")
+            if (
+                key
+                and issue_type_name(issue) == "task"
+                and task_has_subtasks(key, epic_index)
+            ):
+                continue
             est_h = int(get_field(issue, "timeoriginalestimate") or 0) / 3600.0
             classification = classify_issue(
                 issue, timeline_cfg, teams_cfg, config, epic_issues=epic_issues
@@ -371,23 +423,31 @@ def build_timeline_breakdown(
                 )
                 continue
 
-            if classification["kind"] == "unmapped":
+            if classification["kind"] in ("unmapped", "additional_effort"):
                 if est_h > 0 or key in scheduled_keys:
-                    side = member_side_for_classification(classification, side_display_map)
-                    bump_member(
-                        member_stats,
-                        side,
-                        member,
-                        efforts=est_h,
-                        issue_key=key,
-                        stage_name="(unmapped)",
-                    )
+                    is_additional = classification["kind"] == "additional_effort"
+                    if not is_additional:
+                        side = member_side_for_classification(
+                            classification, side_display_map
+                        )
+                        bump_member(
+                            member_stats,
+                            side,
+                            member,
+                            efforts=est_h,
+                            issue_key=key,
+                            stage_name="(unmapped)",
+                        )
                     unmapped.append(
                         {
                             "key": key,
                             "summary": (get_field(issue, "summary") or "")[:80],
                             "effortsHours": est_h,
                             "assignee": member,
+                            "team": additional_effort_team_side(
+                                classification, side_display_map
+                            ),
+                            "additionalEffort": is_additional,
                         }
                     )
                 continue
@@ -413,6 +473,8 @@ def build_timeline_breakdown(
                 if aid:
                     b["resources"].add(aid)
             b["issueKeys"].append(key)
+            member_hours = b.setdefault("memberHours", {})
+            member_hours[member] = member_hours.get(member, 0.0) + est_h
             bump_member(
                 member_stats,
                 member_side,

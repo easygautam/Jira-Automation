@@ -38,6 +38,35 @@ def is_task_or_subtask(issue: dict[str, Any]) -> bool:
     return issue_type_name(issue) in ("task", "sub-task", "subtask")
 
 
+def is_subtask(issue: dict[str, Any]) -> bool:
+    return issue_type_name(issue) in ("sub-task", "subtask")
+
+
+def get_subtasks(
+    parent_key: str, index: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Return sub-tasks whose parent key matches."""
+    out: list[dict[str, Any]] = []
+    for issue in index.values():
+        parent = get_field(issue, "parent") or {}
+        if parent.get("key") == parent_key and is_subtask(issue):
+            out.append(issue)
+    return out
+
+
+def subtasks_estimate_seconds(
+    parent_key: str,
+    index: dict[str, dict[str, Any]],
+    config: dict[str, Any] | None = None,
+) -> int:
+    """Sum Original Estimate on all sub-tasks under a parent task."""
+    return sum(estimate_seconds(st, config) for st in get_subtasks(parent_key, index))
+
+
+def task_has_subtasks(parent_key: str, index: dict[str, dict[str, Any]]) -> bool:
+    return bool(get_subtasks(parent_key, index))
+
+
 def is_bug_issue(issue: dict[str, Any]) -> bool:
     return issue_type_name(issue) == "bug"
 

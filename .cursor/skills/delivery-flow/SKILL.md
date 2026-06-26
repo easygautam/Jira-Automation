@@ -90,8 +90,10 @@ Computed in `scripts/sprintkit/stage_dates.py` after timeline effort aggregation
 
 | Stage | Start | End |
 |-------|-------|-----|
-| Tech Solutioning | Earliest Jira **Start date** among stage tasks; none → `—` | `add_business_days(start, calculatedDays)` (6h calc days) |
-| Development | Earliest Jira Start among dev tasks; Web/Mobile ≥ next workday after BE Development end | same |
+| Tech Solutioning | Earliest Jira **Start date** among stage tasks **and Task/Story parents** (not Epic); none → `—` | `add_business_days(start, max days)` (6h person-days) |
+| Development | Earliest Jira Start among dev tasks + Task/Story parents; Web/Mobile ≥ next workday after BE Development end | same |
 | Other stages | `next_workday(prior_stage_end)` when stage has tasks or effort; **no tasks and no effort → `—`** | same |
+
+**Stage max days** = max person-days across assignees on that stage (`max(effort ÷ 6h)` per member). Synthetic effort-only stages use aggregate `(efforts + leave) ÷ (resources × 6h)`.
 
 Epic rollup: **deliveryStart** = earliest resolved stage start; **goLive** = Go live date stage end (or latest stage end). Working days: `scheduling.workingDayInts` (Mon–Fri).

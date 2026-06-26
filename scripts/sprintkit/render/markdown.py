@@ -110,6 +110,15 @@ def fmt_hours(val: float | None) -> str:
     return str(val) if val == int(val) else f"{val:.1f}"
 
 
+def fmt_hours_with_unit(val: float | None) -> str:
+    """Compact hours for inline detail strings (e.g. 1h, 1.5h)."""
+    if val is None or val == 0:
+        return "0h"
+    if val == int(val):
+        return f"{int(val)}h"
+    return f"{val:.1f}".rstrip("0").rstrip(".") + "h"
+
+
 def fmt_date(val: str | None) -> str:
     return val or "TBD"
 

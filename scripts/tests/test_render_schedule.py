@@ -258,10 +258,9 @@ class TestTimelineSectionsRender(unittest.TestCase):
         self.assertIn("| Backend | 1.0 | 8.0 | 3.0 | 1 |", body)
         # Member breakdown keeps both Planned leave + Unplanned delay columns.
         self.assertIn("| Member | Efforts (h) | Planned leave (h) | Unplanned delay (h) |", body)
-        # Execution-stage table has no Delay (h) column and combines leave; no Start/End.
-        self.assertIn("| Stage | Resources | Efforts (h) | Leave (h) | Calc days |", body)
-        self.assertNotIn("Delay (h)", body)
-        self.assertNotIn("| Start | End |", body)
+        # Execution-stage table uses Max days; no Start/End in sprint timeline stages.
+        self.assertIn("| Stage | Resources | Efforts (h) | Leave (h) | Max days |", body)
+        self.assertNotIn("| Stage | Resources | Efforts (h) | Leave (h) | Max days | Start |", body)
         self.assertIn(
             "[VP-101](https://physicswallah001.atlassian.net/browse/VP-101)",
             body,
@@ -276,7 +275,6 @@ class TestTimelineSectionsRender(unittest.TestCase):
         # Date-only lines removed.
         self.assertNotIn("Epic delivery window", body)
         self.assertNotIn("Go live", body)
-        # Member row: Start/End columns removed; Calc days follows Unplanned delay.
         self.assertIn("| Alice | 8.0 | 2.0 | 1.0 | 2 |", body)
 
 

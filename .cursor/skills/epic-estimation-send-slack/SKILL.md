@@ -30,7 +30,7 @@ Same as `.cursor/skills/epic-estimation/SKILL.md`:
 
 ### FETCH — epic issue tree (no sprint filter)
 
-Follow `.cursor/skills/jira-domain/SKILL.md` epic-scope rules (identical to epic-estimation).
+Follow `.cursor/skills/jira-domain/SKILL.md` epic-scope rules (identical to epic-estimation, including pass 3 subtask fetch).
 
 ### RUN
 

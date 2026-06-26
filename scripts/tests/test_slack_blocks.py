@@ -102,7 +102,22 @@ def _sample_canvas() -> dict:
         jira_site_url="https://example.atlassian.net",
     )
     canvas = dict(result.canvas_data)
-    canvas["unmapped"] = [{"key": "VP-999", "summary": "Orphan task", "effortsHours": 2}]
+    canvas["unmapped"] = [
+        {
+            "key": "VP-999",
+            "summary": "Orphan task",
+            "effortsHours": 2,
+            "assignee": "Alice",
+            "team": "Other",
+        }
+    ]
+    canvas["additionalEfforts"] = [
+        {
+            "team": "Other",
+            "effortHours": 2,
+            "details": "Alice (2h) - VP-999",
+        }
+    ]
     canvas["dataQuality"] = [
         {"member": "Alice", "key": "VP-901", "reason": "Missing estimate on sub-task"}
     ]
@@ -168,10 +183,10 @@ class TestSlackBlocks(unittest.TestCase):
         header_text = header_cells[0]["elements"][0]["elements"][0]["text"]
         self.assertEqual(header_text, "Team")
 
-    def test_unmapped_and_data_quality_sections(self):
+    def test_additional_efforts_and_data_quality_sections(self):
         message = build_slack_blocks(self.canvas)
         headers = [b.get("text", {}).get("text") for b in message["blocks"] if b["type"] == "header"]
-        self.assertIn("Unmapped work", headers)
+        self.assertIn("Additional efforts", headers)
         self.assertIn("Data quality", headers)
 
     def test_fallback_uses_field_grid(self):

@@ -8,17 +8,16 @@ from typing import Any
 from sprintkit.config import SCHEDULABLE_TYPES
 from sprintkit.jira_model import (
     assignee_id,
+    assignee_name,
     bug_missing_logged_time,
     build_index,
     estimate_seconds,
     get_field,
     is_bug_issue,
-    is_task_or_subtask,
     issue_type_name,
     resolve_epic,
+    subtasks_estimate_seconds,
 )
-from sprintkit.stages import qa_platform_from_segment
-from sprintkit.teams import team_from_issue
 
 REASON_MISSING_ESTIMATE = "Missing estimates"
 REASON_MISSING_LOGGED_TIME = "Missing logged time"
@@ -45,7 +44,9 @@ def assignee_display(issue: dict[str, Any], assignee_names: dict[str, str]) -> s
     aid = assignee_id(issue)
     if aid == "unassigned":
         return "Unassigned"
-    return assignee_names.get(aid, aid)
+    if aid in assignee_names:
+        return assignee_names[aid]
+    return assignee_name(issue)
 
 
 def issue_title(issue: dict[str, Any], key: str) -> str:
@@ -78,20 +79,16 @@ def collect_issue_flags(
         if bug_missing_logged_time(issue, config):
             reasons.append(REASON_MISSING_LOGGED_TIME)
     elif key in unscheduled_keys or estimate_seconds(issue, config) <= 0:
-        if REASON_MISSING_ESTIMATE not in reasons:
+        subtask_oe_sum = (
+            subtasks_estimate_seconds(key, index, config)
+            if issue_type_name(issue) == "task"
+            else 0
+        )
+        if subtask_oe_sum <= 0 and REASON_MISSING_ESTIMATE not in reasons:
             reasons.append(REASON_MISSING_ESTIMATE)
 
     if assignee_id(issue) == "unassigned":
         reasons.append(REASON_UNASSIGNED)
-
-    teams_cfg = (config or {}).get("teams") or {}
-    summary = (get_field(issue, "summary") or "").strip()
-    if (
-        is_task_or_subtask(issue)
-        and team_from_issue(issue, teams_cfg, config) == "qa"
-        and qa_platform_from_segment(summary, config) is None
-    ):
-        reasons.append(REASON_QA_MISSING_PLATFORM)
 
     return reasons
 
@@ -181,6 +178,8 @@ def build_data_quality_by_member(
     if timeline:
         for epic in timeline:
             for u in epic.get("unmapped") or []:
+                if u.get("additionalEffort"):
+                    continue
                 ukey = u.get("key")
                 if not ukey:
                     continue

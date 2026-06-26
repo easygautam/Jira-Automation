@@ -15,6 +15,7 @@ from sprintkit.quality import (
     REASON_MISSING_LOGGED_TIME,
     count_dq_reasons,
 )
+from sprintkit.render.additional_efforts import render_additional_efforts_markdown
 from sprintkit.render.markdown import (
     epic_prd_anchor,
     epic_title_link,
@@ -299,7 +300,9 @@ def render_timeline_sections(
         "**Effort** includes **Task** and **Sub-task** issue types only (bugs excluded).  ",
         "Bug effort is in **Bug fix effort** below (same file).",
         "",
-        "**Calc days** = (Efforts + Leave) / (Resources × 6h), shown as decimal person-days.",
+        "**Member calc days** = (Efforts + Leave) / 6h per person.  ",
+        "**Stage max days** = longest assignee load on that stage (max of effort ÷ 6h); "
+        "synthetic buffers use aggregate (efforts ÷ resources × 6h).",
         "",
     ]
 
@@ -365,7 +368,7 @@ def render_timeline_sections(
                     f"{calc_s} | "
                     f"{issues_s} | {tasks_s} |"
                 )
-        stage_header = "| Stage | Resources | Efforts (h) | Leave (h) | Calc days |"
+        stage_header = "| Stage | Resources | Efforts (h) | Leave (h) | Max days |"
         stage_sep = "|-------|-----------|-------------|-----------|-----------|"
 
         def _render_stage_table(stage_rows: list[dict[str, Any]]) -> None:
@@ -413,16 +416,15 @@ def render_timeline_sections(
                 _render_stage_table(block["stages"])
 
         unmapped = epic.get("unmapped") or []
-        if unmapped:
+        extra_lines = render_additional_efforts_markdown(
+            unmapped,
+            jira_site_url=jira_site_url,
+            heading="#### Additional efforts",
+        )
+        if extra_lines:
             if lines and lines[-1] != "":
                 lines.append("")
-            lines.append("#### Unmapped sprint work")
-            lines.append("")
-            for u in unmapped:
-                key_link = jira_issue_link(jira_site_url, u.get("key"))
-                summary = escape_md_cell(u.get("summary", ""))
-                hrs = fmt_hours(u.get("effortsHours"))
-                lines.append(f"- {key_link}: {summary} ({hrs} h)")
+            lines.extend(extra_lines)
             lines.append("")
 
     return lines

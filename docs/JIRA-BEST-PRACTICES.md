@@ -109,7 +109,7 @@ All QA work starts with **`QA |`** and **must** include a platform in the **seco
 | `APP` | Mobile |
 | `BE` | Backend |
 
-Titles without a platform (e.g. `QA | Assessment`, `QA | Test cases — Events`) are **unmapped** and flagged in data quality.
+Titles without a platform (e.g. `QA | Assessment`, `QA | Test cases — Events`) are routed to **Additional efforts** grouped under QA — not delivery stages and not data-quality flags.
 
 ### QA Assessment / Test Planning
 

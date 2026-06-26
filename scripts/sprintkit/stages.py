@@ -4,6 +4,7 @@
 
 * ``{"kind": "leave", "leaveType": ..., "team": ..., "comment": ...}``
 * ``{"kind": "work", "platform": ..., "stage": ..., "team": ..., "issueKey": ...}``
+* ``{"kind": "additional_effort", "platform": None, "stage": None, "team": "qa"}`` — QA without platform segment
 * ``{"kind": "unmapped", "platform": None, "stage": None, "team": ...}``
 
 Stage mapping uses pipe-segment positions only (no keyword substring search).
@@ -372,7 +373,12 @@ def classify_issue(
     if team == "qa" or itype == "test execution":
         qa_platform = qa_platform_from_segment(summary, config)
         if not qa_platform:
-            return {"kind": "unmapped", "platform": None, "stage": None, "team": "qa"}
+            return {
+                "kind": "additional_effort",
+                "platform": None,
+                "stage": None,
+                "team": "qa",
+            }
 
         if _is_qa_test_planning(summary):
             return _work(qa_platform, STAGE_QA_TEST_PLANNING, "qa")

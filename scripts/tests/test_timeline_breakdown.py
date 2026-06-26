@@ -19,7 +19,13 @@ from sprintkit.stages import (  # noqa: E402
     TEAM_PRODUCT_DESIGN,
     classify_issue,
 )
-from sprintkit.timeline import build_timeline_breakdown, calc_days, format_calc_days  # noqa: E402
+from sprintkit.timeline import (  # noqa: E402
+    build_timeline_breakdown,
+    calc_days,
+    format_calc_days,
+    stage_max_days,
+    _empty_stage_bucket,
+)
 
 
 def _issue(
@@ -188,12 +194,12 @@ class TestClassifyIssue(unittest.TestCase):
         self.assertEqual(result["stage"], STAGE_DEVELOPMENT)
         self.assertEqual(result["platform"], "backend")
 
-    def test_qa_assessment_without_platform_unmapped(self):
+    def test_qa_assessment_without_platform_additional_effort(self):
         issue = _issue("VP-3", "QA | Assessment", 7200)
         result = classify_issue(
             issue, MINIMAL_CONFIG["timeline"], MINIMAL_CONFIG["teams"], MINIMAL_CONFIG
         )
-        self.assertEqual(result["kind"], "unmapped")
+        self.assertEqual(result["kind"], "additional_effort")
         self.assertEqual(result["team"], "qa")
 
     def test_qa_app_assessment_test_planning(self):
@@ -416,12 +422,83 @@ class TestBuildTimelineBreakdown(unittest.TestCase):
             planning = _stage_row(result, plat, STAGE_QA_TEST_PLANNING)
             self.assertIsNone(planning["effortsHours"])
 
-    def test_legacy_qa_assessment_unmapped(self):
+    def test_legacy_qa_assessment_additional_effort(self):
         epic = _epic("VP-800")
         qa = _issue("VP-801", "QA | Assessment", 3600, parent_key="VP-800")
         result = build_timeline_breakdown([epic, qa], {"scheduled": []}, MINIMAL_CONFIG)[0]
         self.assertEqual(len(result["unmapped"]), 1)
         self.assertEqual(result["unmapped"][0]["key"], "VP-801")
+        self.assertEqual(result["unmapped"][0]["team"], "QA")
+        self.assertTrue(result["unmapped"][0].get("additionalEffort"))
+        self.assertTrue(result["unmapped"][0].get("additionalEffort"))
+        self.assertNotIn("Other", result["membersBySide"])
+        self.assertNotIn("QA", result["membersBySide"])
+
+    def test_qa_additional_effort_without_platform_gets_qa_team(self):
+        epic = _epic("VP-810")
+        qa = _issue(
+            "VP-811",
+            "QA | 1v1 Live Battles PRD | KT",
+            3600,
+            parent_key="VP-810",
+            assignee="Shubham",
+        )
+        result = build_timeline_breakdown([epic, qa], {"scheduled": []}, MINIMAL_CONFIG)[0]
+        self.assertEqual(result["unmapped"][0]["team"], "QA")
+        self.assertTrue(result["unmapped"][0].get("additionalEffort"))
+        other_members = result["membersBySide"].get("Other") or []
+        self.assertFalse(any("VP-811" in (m.get("issueKeys") or []) for m in other_members))
+
+    def test_parent_task_skipped_when_subtasks_present(self):
+        epic = _epic("VP-900", "1v1 Battles")
+        parent = _issue(
+            "VP-901",
+            "APP | Development 1v1 Battle",
+            0,
+            parent_key="VP-900",
+            assignee="Rajat",
+        )
+        sub = _issue(
+            "VP-902",
+            "APP | 1v1 Battle | Firebase FCM push notification setup",
+            14400,
+            parent_key="VP-901",
+            issuetype="Sub-task",
+            assignee="Rajat",
+        )
+        result = build_timeline_breakdown(
+            [epic, parent, sub], {"scheduled": []}, MINIMAL_CONFIG
+        )[0]
+        dev = _stage_row(result, "mobile", STAGE_DEVELOPMENT)
+        self.assertEqual(dev["effortsHours"], 4.0)
+        self.assertIn("VP-902", dev["issueKeys"])
+        self.assertNotIn("VP-901", dev["issueKeys"])
+
+
+class TestStageMaxDays(unittest.TestCase):
+    def test_max_person_days_across_assignees(self):
+        epic = _epic("VP-800")
+        t1 = _issue("VP-801", "App || work", 81 * 3600, parent_key="VP-800", assignee="Rajat")
+        t2 = _issue("VP-802", "App || work2", 30 * 3600, parent_key="VP-800", assignee="Bob")
+        t3 = _issue("VP-803", "App || work3", 15 * 3600, parent_key="VP-800", assignee="Carol")
+        result = build_timeline_breakdown(
+            [epic, t1, t2, t3], {"scheduled": []}, MINIMAL_CONFIG
+        )[0]
+        dev = _stage_row(result, "mobile", STAGE_DEVELOPMENT)
+        self.assertEqual(dev["calculatedDays"], 13.5)
+        self.assertNotEqual(dev["calculatedDays"], 6.33)
+
+    def test_stage_max_days_helper_synthetic_fallback(self):
+        bucket = _empty_stage_bucket()
+        bucket["effortsHours"] = 6.0
+        self.assertEqual(stage_max_days(bucket, 6), 1.0)
+
+    def test_stage_max_days_helper_uses_member_hours(self):
+        bucket = _empty_stage_bucket()
+        bucket["memberHours"] = {"Rajat": 81.0, "Bob": 30.0, "Carol": 15.0}
+        bucket["effortsHours"] = 114.0
+        bucket["resources"] = {"Rajat", "Bob", "Carol"}
+        self.assertEqual(stage_max_days(bucket, 6), 13.5)
 
 
 if __name__ == "__main__":

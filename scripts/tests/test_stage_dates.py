@@ -24,18 +24,24 @@ def _issue(
     *,
     estimate_seconds: int = 0,
     parent_key: str = "E1",
+    parent_type: str = "Epic",
     start_date: str | None = None,
+    issuetype: str = "Task",
 ) -> dict:
     fields: dict = {
         "summary": summary,
         "timeoriginalestimate": estimate_seconds,
-        "issuetype": {"name": "Task"},
+        "issuetype": {"name": issuetype},
         "assignee": {"displayName": "Alice", "accountId": "alice"},
-        "parent": {"key": parent_key, "fields": {"issuetype": {"name": "Epic"}}},
+        "parent": {"key": parent_key, "fields": {"issuetype": {"name": parent_type}}},
     }
     if start_date:
         fields["customfield_10015"] = start_date
     return {"key": key, "fields": fields}
+
+
+def _epic(key: str = "E1") -> dict:
+    return {"key": key, "fields": {"issuetype": {"name": "Epic", "hierarchyLevel": 1}}}
 
 
 CONFIG = {
@@ -223,6 +229,95 @@ class TestComputeStageDates(unittest.TestCase):
         self.assertAlmostEqual(final["calculatedDays"], 0.2, places=2)
         self.assertEqual(final["start"], "2026-06-25")
         self.assertEqual(final["end"], "2026-06-25")
+
+    def test_parent_task_start_anchors_subtask_only_stage(self):
+        issues = [
+            _epic(),
+            _issue("T-PARENT", "App | Development", start_date="2026-06-17"),
+            _issue(
+                "ST1",
+                "sub work",
+                parent_key="T-PARENT",
+                parent_type="Task",
+                issuetype="Sub-task",
+            ),
+        ]
+        epic_row = {
+            "executionStages": {
+                "backend": _platform_block([], has_work=False),
+                "frontend": _platform_block([], has_work=False),
+                "mobile": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["ST1"], efforts_hours=12)]
+                ),
+            },
+        }
+        compute_stage_dates(epic_row, issues, CONFIG)
+        dev = epic_row["executionStages"]["mobile"]["stages"][0]
+        self.assertEqual(dev["start"], "2026-06-17")
+
+    def test_earliest_start_wins_parent_vs_subtask(self):
+        issues = [
+            _epic(),
+            _issue("T-PARENT", "App | Development", start_date="2026-06-17"),
+            _issue(
+                "ST1",
+                "sub work",
+                parent_key="T-PARENT",
+                parent_type="Task",
+                issuetype="Sub-task",
+                start_date="2026-06-10",
+            ),
+        ]
+        epic_row = {
+            "executionStages": {
+                "backend": _platform_block([], has_work=False),
+                "frontend": _platform_block([], has_work=False),
+                "mobile": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["ST1"], efforts_hours=12)]
+                ),
+            },
+        }
+        compute_stage_dates(epic_row, issues, CONFIG)
+        dev = epic_row["executionStages"]["mobile"]["stages"][0]
+        self.assertEqual(dev["start"], "2026-06-10")
+
+    def test_story_ancestor_included_epic_start_excluded(self):
+        issues = [
+            _epic(),
+            _issue(
+                "STORY-1",
+                "Story",
+                parent_key="E1",
+                parent_type="Epic",
+                issuetype="Story",
+                start_date="2026-06-05",
+            ),
+            _issue(
+                "T1",
+                "App | Development",
+                parent_key="STORY-1",
+                parent_type="Story",
+            ),
+            _issue(
+                "ST1",
+                "sub",
+                parent_key="T1",
+                parent_type="Task",
+                issuetype="Sub-task",
+            ),
+        ]
+        epic_row = {
+            "executionStages": {
+                "backend": _platform_block([], has_work=False),
+                "frontend": _platform_block([], has_work=False),
+                "mobile": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["ST1"], efforts_hours=12)]
+                ),
+            },
+        }
+        compute_stage_dates(epic_row, issues, CONFIG)
+        dev = epic_row["executionStages"]["mobile"]["stages"][0]
+        self.assertEqual(dev["start"], "2026-06-05")
 
 
 if __name__ == "__main__":

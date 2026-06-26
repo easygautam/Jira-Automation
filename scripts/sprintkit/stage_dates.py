@@ -6,7 +6,13 @@ import math
 from datetime import date
 from typing import Any
 
-from sprintkit.jira_model import build_index, jira_start_date
+from sprintkit.jira_model import (
+    build_index,
+    get_field,
+    is_epic_issue,
+    issue_type_name,
+    jira_start_date,
+)
 from sprintkit.schedule import add_business_days, next_working_day
 from sprintkit.stages import (
     PLATFORM_KEYS,
@@ -15,10 +21,41 @@ from sprintkit.stages import (
     STAGE_TECH_SOLUTIONING,
 )
 
+_START_ANCHOR_TYPES = frozenset({"task", "sub-task", "subtask", "story"})
+
 
 def _working_days(config: dict[str, Any]) -> set[int]:
     scheduling = config.get("scheduling") or {}
     return set(scheduling.get("workingDayInts", [0, 1, 2, 3, 4]))
+
+
+def _start_anchor_keys(
+    issue_keys: list[str],
+    index: dict[str, dict[str, Any]],
+) -> list[str]:
+    """Expand issue keys with Task/Story ancestors (stop at Epic)."""
+    keys: set[str] = set()
+    for key in issue_keys:
+        if not key:
+            continue
+        current = index.get(key)
+        if not current:
+            continue
+        keys.add(key)
+        while current:
+            parent = get_field(current, "parent")
+            if not parent or not parent.get("key"):
+                break
+            pk = parent["key"]
+            parent_issue = index.get(pk)
+            if not parent_issue:
+                break
+            if is_epic_issue(parent_issue):
+                break
+            if issue_type_name(parent_issue).lower() in _START_ANCHOR_TYPES:
+                keys.add(pk)
+            current = parent_issue
+    return list(keys)
 
 
 def _min_jira_start(
@@ -27,7 +64,7 @@ def _min_jira_start(
     config: dict[str, Any],
 ) -> date | None:
     dates: list[date] = []
-    for key in issue_keys:
+    for key in _start_anchor_keys(issue_keys, index):
         issue = index.get(key)
         if not issue:
             continue

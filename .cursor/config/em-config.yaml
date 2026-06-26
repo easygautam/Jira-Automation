@@ -25,6 +25,7 @@ fields:
 epicEstimation:
   epicScopeJql: 'key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey}'
   taskScopeJql: 'parent in ({parentKeys})'
+  subtaskScopeJql: 'parent in ({taskKeys})'
 
 scheduling:
   hoursPerDay: 8

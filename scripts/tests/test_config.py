@@ -130,6 +130,13 @@ class TestDefaultConfig(unittest.TestCase):
 
 
 class TestMemberSideClassification(unittest.TestCase):
+    def test_additional_effort_qa_side(self):
+        side = member_side_for_classification(
+            {"kind": "additional_effort", "team": "qa"},
+            {"qa": "QA", "other": "Other"},
+        )
+        self.assertEqual(side, "QA")
+
     def test_unmapped_always_other(self):
         side_map = resolve_side_display_map({})
         result = member_side_for_classification(
@@ -189,18 +196,17 @@ class TestTimelineWithoutPyYaml(unittest.TestCase):
             [m["member"] for m in result["membersBySide"]["QA"]],
         )
 
-    def test_unmapped_prefix_goes_to_other_only(self):
+    def test_qa_without_platform_additional_effort_not_in_member_breakdown(self):
         config_module._pyyaml_warning_emitted = False
         with mock.patch.object(config_module, "yaml", None):
             cfg = load_config(ROOT / ".cursor/config/em-config.yaml")
         epic = _epic("VP-300")
         task = _issue("VP-301", "QA | Assessment", 3600, parent_key="VP-300", assignee="Pat")
         result = build_timeline_breakdown([epic, task], {"scheduled": []}, cfg)[0]
-        self.assertIn("Other", result["membersBySide"])
-        self.assertIn(
-            "Pat",
-            [m["member"] for m in result["membersBySide"]["Other"]],
-        )
+        self.assertEqual(len(result["unmapped"]), 1)
+        self.assertTrue(result["unmapped"][0].get("additionalEffort"))
+        self.assertEqual(result["unmapped"][0]["team"], "QA")
+        self.assertNotIn("Other", result["membersBySide"])
         self.assertNotIn("QA", result["membersBySide"])
 
 

@@ -292,7 +292,17 @@ class TestDataQuality(unittest.TestCase):
         self.assertEqual(counts[REASON_MISSING_ESTIMATE], 1)
         self.assertEqual(counts[REASON_UNASSIGNED], 1)
 
-    def test_qa_missing_platform_segment(self):
+    def test_assignee_display_falls_back_to_display_name(self):
+        issue = _issue("VP-99", "APP | work", parent_key="VP-EPIC", assignee="Carol")
+        issue["fields"]["assignee"] = {
+            "accountId": "acct-123",
+            "displayName": "Carol Smith",
+        }
+        from sprintkit.quality import assignee_display
+
+        self.assertEqual(assignee_display(issue, {}), "Carol Smith")
+
+    def test_qa_without_platform_not_dq_flagged(self):
         issue = _issue("VP-99", "QA | Assessment", parent_key="VP-EPIC", assignee="Carol")
         config = {
             **CONFIG,
@@ -306,7 +316,40 @@ class TestDataQuality(unittest.TestCase):
         }
         index = build_index([issue])
         reasons = collect_issue_flags(issue, index, set(), config)
-        self.assertIn(REASON_QA_MISSING_PLATFORM, reasons)
+        self.assertNotIn(REASON_QA_MISSING_PLATFORM, reasons)
+        self.assertNotIn(REASON_TIMELINE_UNMAPPED, reasons)
+
+    def test_qa_additional_effort_skips_timeline_dq(self):
+        epic = _epic("VP-2")
+        task = _issue(
+            "VP-99",
+            "QA | KT session",
+            parent_key="VP-2",
+            assignee="Carol",
+            estimate_seconds=3600,
+        )
+        timeline = [
+            {
+                "epicKey": "VP-2",
+                "unmapped": [
+                    {
+                        "key": "VP-99",
+                        "summary": "QA | KT session",
+                        "assignee": "Carol",
+                        "effortsHours": 1,
+                        "additionalEffort": True,
+                    }
+                ],
+            }
+        ]
+        result = build_data_quality_by_member(
+            [epic, task],
+            {"unscheduled": [], "violations": []},
+            timeline,
+            {"Carol": "Carol"},
+        )
+        all_reasons = [r["reason"] for rows in result.values() for r in rows]
+        self.assertFalse(any(REASON_TIMELINE_UNMAPPED in r for r in all_reasons))
 
     def test_timeline_unmapped(self):
         epic = _epic("VP-2")
@@ -333,6 +376,21 @@ class TestDataQuality(unittest.TestCase):
         self.assertTrue(
             any(REASON_TIMELINE_UNMAPPED in r["reason"] for r in result["Bob"])
         )
+
+    def test_parent_task_not_flagged_when_subtasks_have_estimates(self):
+        epic = _epic("VP-2")
+        parent = _issue("VP-50", "APP | Development", parent_key="VP-2", assignee="Rajat")
+        sub = _issue(
+            "VP-51",
+            "APP | slice",
+            estimate_seconds=14400,
+            parent_key="VP-50",
+            issuetype="Sub-task",
+            assignee="Rajat",
+        )
+        index = build_index([epic, parent, sub])
+        reasons = collect_issue_flags(parent, index, set(), CONFIG)
+        self.assertNotIn(REASON_MISSING_ESTIMATE, reasons)
 
 
 if __name__ == "__main__":

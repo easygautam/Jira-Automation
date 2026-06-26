@@ -47,6 +47,9 @@ key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey}
 
 # Pass 2 — epicEstimation.taskScopeJql ({parentKeys} = story keys from pass 1)
 parent in ({parentKeys})
+
+# Pass 3 — epicEstimation.subtaskScopeJql ({taskKeys} = Task keys from pass 1 + pass 2)
+parent in ({taskKeys})
 ```
 
 Write merged issues to `scripts/.tmp/epic-{epicKey}-issues.json`. Include `fields.startDate` (`customfield_10015` by default), `duedate`, and `fields.teams` in MCP field list.

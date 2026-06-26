@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from sprintkit.render.additional_efforts import build_additional_efforts_rows
 from sprintkit.timeline import format_calc_days
 
 MAX_BLOCKS_PER_MESSAGE = 50
@@ -13,8 +14,9 @@ CHART_LABEL_MAX = 20
 CHART_TITLE_MAX = 50
 
 TEAMS_HEADERS = ["Team", "Peak", "Effort (h)", "Leave (h)", "Tasks"]
-STAGE_HEADERS = ["Stage", "Res", "Effort (h)", "Leave (h)", "Days", "Dates"]
+STAGE_HEADERS = ["Stage", "Res", "Effort (h)", "Leave (h)", "Max days", "Dates"]
 MEMBER_HEADERS = ["Team", "Member", "Effort (h)", "Leave (h)", "Days", "Tasks"]
+ADDITIONAL_EFFORTS_HEADERS = ["Team", "Effort (h)", "Details"]
 
 
 def fmt_display_date(value: str | None) -> str:
@@ -405,20 +407,50 @@ def _hero_blocks(canvas: dict[str, Any]) -> list[dict[str, Any]]:
         blocks.append(_context_mrkdwn(caption))
 
     if unmapped:
-        blocks.append(_section_mrkdwn(f":warning: *Unmapped tasks:* {len(unmapped)}"))
+        blocks.append(
+            _section_mrkdwn(f":warning: *Additional efforts:* {len(unmapped)} task(s)")
+        )
     return blocks
 
 
-def _unmapped_blocks(canvas: dict[str, Any]) -> list[dict[str, Any]]:
-    unmapped = canvas.get("unmapped") or []
-    if not unmapped:
-        return []
+def _additional_efforts_table_rows(canvas: dict[str, Any]) -> list[list[str]]:
     site = canvas.get("jiraSiteUrl") or ""
-    lines = [
-        f"• {_issue_link(site, u.get('key', ''))}: {u.get('summary', '')} ({u.get('effortsHours')}h)"
-        for u in unmapped
+
+    def _slack_keys(site_url: str | None, keys: list[str] | None) -> str:
+        if not keys:
+            return "—"
+        return ", ".join(_issue_link(site_url or "", k) for k in keys)
+
+    rows_data = canvas.get("additionalEfforts")
+    if rows_data is None:
+        rows_data = build_additional_efforts_rows(
+            canvas.get("unmapped") or [],
+            jira_site_url=site or None,
+            link_keys=_slack_keys,
+        )
+    return [
+        [row["team"], fmt_num(row.get("effortHours")), row.get("details") or "—"]
+        for row in rows_data
     ]
-    return [_plain_header("Unmapped work"), _section_mrkdwn("\n".join(lines))]
+
+
+def _additional_efforts_blocks(
+    canvas: dict[str, Any], *, use_native_table: bool
+) -> list[dict[str, Any]]:
+    rows = _additional_efforts_table_rows(canvas)
+    if not rows:
+        return []
+    blocks: list[dict[str, Any]] = []
+    _append_data_table(
+        blocks,
+        "Additional efforts",
+        ADDITIONAL_EFFORTS_HEADERS,
+        rows,
+        numeric_columns={1},
+        wrap_columns={0, 2},
+        use_native_table=use_native_table,
+    )
+    return blocks
 
 
 def _data_quality_blocks(canvas: dict[str, Any]) -> list[dict[str, Any]]:
@@ -457,7 +489,7 @@ def _build_body_blocks(canvas: dict[str, Any], *, use_native_table: bool) -> lis
         wrap_columns={0, 1, 5},
         use_native_table=use_native_table,
     )
-    blocks.extend(_unmapped_blocks(canvas))
+    blocks.extend(_additional_efforts_blocks(canvas, use_native_table=use_native_table))
     blocks.extend(_data_quality_blocks(canvas))
     return blocks
 

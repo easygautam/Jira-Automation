@@ -156,10 +156,10 @@ class TestPipePrefix(unittest.TestCase):
         self.assertEqual(result["stage"], "Stage testing")
         self.assertEqual(result["platform"], "mobile")
 
-    def test_qa_assessment_without_platform_unmapped(self):
+    def test_qa_assessment_without_platform_additional_effort(self):
         issue = _issue("QA | Assessment")
         result = classify_issue(issue, CONFIG["timeline"], CONFIG["teams"], CONFIG)
-        self.assertEqual(result["kind"], "unmapped")
+        self.assertEqual(result["kind"], "additional_effort")
         self.assertEqual(result["team"], "qa")
 
 
@@ -225,11 +225,11 @@ class TestTeamsFieldFallback(unittest.TestCase):
         self.assertEqual(result["stage"], STAGE_UAT)
         self.assertEqual(result["team"], "product_design")
 
-    def test_qa_field_without_platform_unmapped(self):
+    def test_qa_field_without_platform_additional_effort(self):
         issue = _issue("TC-040: Verify fallback", teams_field="QA")
         self.assertEqual(team_from_issue(issue, CONFIG["teams"], CONFIG), "qa")
         result = classify_issue(issue, CONFIG["timeline"], CONFIG["teams"], CONFIG)
-        self.assertEqual(result["kind"], "unmapped")
+        self.assertEqual(result["kind"], "additional_effort")
 
     def test_other_teams_field_unmapped(self):
         issue = _issue("Misc work", teams_field="Other Teams")

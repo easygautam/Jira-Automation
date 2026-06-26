@@ -32,9 +32,10 @@ Follow `.cursor/skills/jira-domain/SKILL.md` epic-scope rules:
 1. `getAccessibleAtlassianResources` when `cloudId` empty.
 2. Discover Start date field if needed → `fields.startDate` in config.
 3. **Pass 1** — `searchJiraIssuesUsingJql` with `epicEstimation.epicScopeJql` (substitute `{epicKey}` only).
-4. **Pass 2** — fetch tasks/sub-tasks: `epicEstimation.taskScopeJql` with `{parentKeys}` = story keys from pass 1.
-5. Fields: sprint fetch set **plus** `duedate`, `fields.startDate`, `fields.teams`.
-6. Merge + dedupe → `scripts/.tmp/epic-{epicKey}-issues.json`.
+4. **Pass 2** — fetch tasks/sub-tasks under stories: `epicEstimation.taskScopeJql` with `{parentKeys}` = story keys from pass 1.
+5. **Pass 3** — fetch sub-tasks under tasks: `epicEstimation.subtaskScopeJql` with `{taskKeys}` = Task keys from passes 1–2 (exclude Epic/Story).
+6. Fields: sprint fetch set **plus** `duedate`, `fields.startDate`, `fields.teams`.
+7. Merge + dedupe → `scripts/.tmp/epic-{epicKey}-issues.json`.
 
 ### RUN
 
@@ -60,9 +61,11 @@ Stdout is a single JSON object (`epicKey`, `deliveryStart`, `goLive`, `timeline`
 
 | Stage | Start | End |
 |-------|-------|-----|
-| Tech Solutioning | Earliest Jira Start among stage tasks; none → `—` | `add_business_days(start, calculatedDays)` |
-| Development | Earliest Jira Start among dev tasks; Web/Mobile ≥ BE dev end | same |
+| Tech Solutioning | Earliest Jira Start among stage tasks **and Task/Story parents** (not Epic); none → `—` | `add_business_days(start, max days)` |
+| Development | Earliest Jira Start among dev tasks + Task/Story parents; Web/Mobile ≥ BE dev end | same |
 | Other stages | `next_workday(prior_stage_end)` when stage has tasks or effort; no tasks/effort → `—` | same |
+
+**Stage max days** = longest assignee load on that stage (max of effort ÷ 6h per person). Synthetic buffers (Bug fixes, Stage final testing) use aggregate formula. **Member calc days** = that member's total effort ÷ 6h.
 
 Effort: `build_timeline_breakdown` (6h/day, Task/Sub-task only). Details: `delivery-flow` skill.
 

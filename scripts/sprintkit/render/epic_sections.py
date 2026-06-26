@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from sprintkit.render.additional_efforts import (
+    build_additional_efforts_rows,
+    render_additional_efforts_markdown,
+)
 from sprintkit.render.markdown import (
     escape_md_cell,
     fmt_hours,
@@ -91,7 +95,7 @@ def build_epic_markdown(
             continue
         lines.extend(["", f"## Execution stages — {label}", ""])
         lines.append(
-            "| Stage | Resources | Efforts (h) | Leave (h) | Calc days | Start | End |"
+            "| Stage | Resources | Efforts (h) | Leave (h) | Max days | Start | End |"
         )
         lines.append(
             "|-------|-----------|-------------|-----------|-----------|-------|-----|"
@@ -113,15 +117,11 @@ def build_epic_markdown(
             )
 
     unmapped = epic_row.get("unmapped") or []
-    if unmapped:
-        lines.extend(["", "## Unmapped work", ""])
-        for u in unmapped:
-            key = u.get("key", "")
-            lines.append(
-                f"- {jira_issue_link(jira_site_url, key)}: "
-                f"{escape_md_cell(u.get('summary', ''))} "
-                f"({fmt_hours(u.get('effortsHours'))} h)"
-            )
+    lines.extend(
+        render_additional_efforts_markdown(
+            unmapped, jira_site_url=jira_site_url, heading="## Additional efforts"
+        )
+    )
 
     if quality:
         flagged = sum(len(v) for v in quality.values())
@@ -222,6 +222,9 @@ def build_canvas_data(
         "members": members,
         "platforms": platforms,
         "unmapped": epic_row.get("unmapped") or [],
+        "additionalEfforts": build_additional_efforts_rows(
+            epic_row.get("unmapped") or [], jira_site_url=site
+        ),
         "dataQuality": dq_rows,
     }
 

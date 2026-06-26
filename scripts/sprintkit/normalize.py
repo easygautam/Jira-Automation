@@ -17,6 +17,7 @@ from sprintkit.jira_model import (
     priority_rank,
     resolve_epic,
     resolve_story,
+    task_has_subtasks,
 )
 from sprintkit.teams import delivery_platform, team_from_issue
 
@@ -63,6 +64,10 @@ def normalize(
     for issue in issues:
         t = issue_type_name(issue)
         if t not in SCHEDULABLE_TYPES:
+            continue
+
+        issue_key = issue.get("key") or ""
+        if t == "task" and task_has_subtasks(issue_key, index):
             continue
 
         story = resolve_story(issue, index)
