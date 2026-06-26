@@ -341,6 +341,9 @@ class TestScheduleDeltaSection(unittest.TestCase):
             "[VP-9](https://physicswallah001.atlassian.net/browse/VP-9)",
             body,
         )
+        self.assertIn("01-06-2026", body)
+        self.assertIn("03-06-2026", body)
+        self.assertNotIn("2026-06-01", body)
 
 
 class TestExecutiveSummary(unittest.TestCase):
@@ -368,6 +371,7 @@ class TestExecutiveSummary(unittest.TestCase):
         )
         self.assertIn("active bugs (estimate not required yet)", body)
         self.assertIn("tasks missing Original Estimate", body)
+        self.assertIn("01-06-2026 → 12-06-2026", body)
 
 
 if __name__ == "__main__":

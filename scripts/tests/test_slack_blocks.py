@@ -126,7 +126,7 @@ def _sample_canvas() -> dict:
 
 class TestSlackBlockFormatting(unittest.TestCase):
     def test_fmt_display_date(self):
-        self.assertEqual(fmt_display_date("2026-06-10"), "10 Jun 2026")
+        self.assertEqual(fmt_display_date("2026-06-10"), "10-06-2026")
         self.assertEqual(fmt_display_date(None), "—")
 
     def test_delivery_window_caption(self):
@@ -219,7 +219,7 @@ class TestSlackBlocks(unittest.TestCase):
             }
         )
         self.assertEqual(row[0], "Development")
-        self.assertIn("Jun 2026", row[5])
+        self.assertEqual(row[5], "22-06-2026 → 22-06-2026")
 
 
 class TestSlackClient(unittest.TestCase):

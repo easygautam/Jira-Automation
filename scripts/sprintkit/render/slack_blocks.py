@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any
 
 from sprintkit.render.additional_efforts import build_additional_efforts_rows
+from sprintkit.render.markdown import fmt_date
 from sprintkit.timeline import format_calc_days
 
 MAX_BLOCKS_PER_MESSAGE = 50
@@ -20,13 +21,7 @@ ADDITIONAL_EFFORTS_HEADERS = ["Team", "Effort (h)", "Details"]
 
 
 def fmt_display_date(value: str | None) -> str:
-    if not value:
-        return "—"
-    try:
-        parsed = date.fromisoformat(value)
-    except ValueError:
-        return value
-    return f"{parsed.day} {parsed.strftime('%b %Y')}"
+    return fmt_date(value)
 
 
 def fmt_num(value: float | int | None) -> str:

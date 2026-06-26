@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sprintkit.jira_model import epic_jira_sort_key, is_epic_issue
-from sprintkit.render.markdown import linkify_bare_issue_keys, resolve_jira_site_url
+from sprintkit.render.markdown import fmt_date, fmt_date_range, linkify_bare_issue_keys, resolve_jira_site_url
 from sprintkit.render.sections import (
     render_delivery_items,
     render_epic_quality_report,
@@ -47,7 +47,8 @@ def render_report(
         sprint_end = sprint_meta.get("sprintEnd", sprint_end)
         sprint_label = sprint_meta.get("sprintName", sprint_label)
 
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_dt = datetime.now(timezone.utc)
+    now = f"{fmt_date(now_dt.date().isoformat())} {now_dt.strftime('%H:%M')} UTC"
 
     epic_keys = {i["key"] for i in issues if is_epic_issue(i)}
     for row in scheduled:
@@ -61,7 +62,7 @@ def render_report(
         f"# Sprint Report — {project} — {sprint_label}",
         "",
         f"**Generated:** {now}  ",
-        f"**Sprint window:** {sprint_start} → {sprint_end}",
+        f"**Sprint window:** {fmt_date_range(sprint_start, sprint_end)}",
         "",
     ]
 

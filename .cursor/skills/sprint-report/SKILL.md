@@ -48,7 +48,7 @@ python scripts/sprint_report.py \
   --project {projectKey}   # optional when jira.projectKey is set in config
 ```
 
-The command writes `reports/sprint-{YYYY-MM-DD}.md` and prints a JSON summary (status counts, scheduled/unscheduled, sprint window). It also snapshots pipeline JSON under `scripts/.tmp/` (`sprint-meta`, `engine-input`, `schedule`, `timeline-breakdown`, `bug-effort-breakdown`) for debugging and recalculation continuity.
+The command writes `reports/sprint-{DD-MM-YYYY}.md` and prints a JSON summary (status counts, scheduled/unscheduled, sprint window). It also snapshots pipeline JSON under `scripts/.tmp/` (`sprint-meta`, `engine-input`, `schedule`, `timeline-breakdown`, `bug-effort-breakdown`) for debugging and recalculation continuity.
 
 **Options**
 

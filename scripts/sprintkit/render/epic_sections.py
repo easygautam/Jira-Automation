@@ -10,6 +10,7 @@ from sprintkit.render.additional_efforts import (
 )
 from sprintkit.render.markdown import (
     escape_md_cell,
+    fmt_date,
     fmt_hours,
     fmt_resources,
     jira_issue_keys_linked,
@@ -19,10 +20,6 @@ from sprintkit.timeline import format_calc_days
 from sprintkit.render.sections import TEAM_PLAN_ORDER
 
 PLATFORM_LABELS = {"backend": "Backend", "frontend": "Web", "mobile": "Mobile"}
-
-
-def _fmt_date(value: str | None) -> str:
-    return value if value else "—"
 
 
 def build_epic_markdown(
@@ -38,8 +35,8 @@ def build_epic_markdown(
         "",
         f"**{escape_md_cell(prd_name)}**",
         "",
-        f"- Delivery start: {_fmt_date(epic_row.get('deliveryStart'))}",
-        f"- Go-live: {_fmt_date(epic_row.get('goLive'))}",
+        f"- Delivery start: {fmt_date(epic_row.get('deliveryStart'))}",
+        f"- Go-live: {fmt_date(epic_row.get('goLive'))}",
         "",
         "## Teams plan",
         "",
@@ -113,7 +110,7 @@ def build_epic_markdown(
                 f"{fmt_resources(row.get('resources'))} | "
                 f"{fmt_hours(row.get('effortsHours'))} | "
                 f"{fmt_hours(combined_leave or None)} | "
-                f"{calc_s} | {_fmt_date(row.get('start'))} | {_fmt_date(row.get('end'))} |"
+                f"{calc_s} | {fmt_date(row.get('start'))} | {fmt_date(row.get('end'))} |"
             )
 
     unmapped = epic_row.get("unmapped") or []

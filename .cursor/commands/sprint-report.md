@@ -2,7 +2,7 @@
 
 Run the EM sprint report through `.cursor/agents/sprint-analyst.md` (runbook: `.cursor/skills/sprint-report/SKILL.md`).
 
-One pipeline (`scripts/sprint_report.py`) fetches → maps platform/team → maps leaves → maps stages → calculates effort, then renders all six deliverables into `reports/sprint-{YYYY-MM-DD}.md`. Summarize status counts (on_track / at_risk / delayed / blocked) in chat.
+One pipeline (`scripts/sprint_report.py`) fetches → maps platform/team → maps leaves → maps stages → calculates effort, then renders all six deliverables into `reports/sprint-{DD-MM-YYYY}.md`. Summarize status counts (on_track / at_risk / delayed / blocked) in chat.
 
 ## Options
 

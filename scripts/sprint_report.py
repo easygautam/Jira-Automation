@@ -123,7 +123,7 @@ def main() -> None:
             Path(args.output).write_text(result.markdown, encoding="utf-8")
         return
 
-    out_path = args.output or f"reports/sprint-{datetime.now().strftime('%Y-%m-%d')}.md"
+    out_path = args.output or f"reports/sprint-{datetime.now().strftime('%d-%m-%Y')}.md"
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     Path(out_path).write_text(result.markdown, encoding="utf-8")
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from typing import Any
 
 _ATLASSIAN_SITE_RE = re.compile(r"https://[a-zA-Z0-9-]+\.atlassian\.net")
@@ -120,7 +121,20 @@ def fmt_hours_with_unit(val: float | None) -> str:
 
 
 def fmt_date(val: str | None) -> str:
-    return val or "TBD"
+    """Format ISO date for reports: DD-MM-YYYY."""
+    if not val:
+        return "—"
+    try:
+        parsed = date.fromisoformat(str(val)[:10])
+    except ValueError:
+        return val
+    return f"{parsed.day:02d}-{parsed.month:02d}-{parsed.year}"
+
+
+def fmt_date_range(start: str | None, end: str | None) -> str:
+    if not start or not end:
+        return "—"
+    return f"{fmt_date(start)} → {fmt_date(end)}"
 
 
 def fmt_resources(val: float | None) -> str:

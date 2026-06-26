@@ -16,7 +16,7 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
    - `/epic-estimation` → `.cursor/skills/epic-estimation/SKILL.md` (Canvas only — **no report file**)
    - `/epic-estimation-send-slack` → `.cursor/skills/epic-estimation-send-slack/SKILL.md` (Canvas + Slack Block Kit)
    - `/improve-workflow` → `.cursor/skills/improve-workflow/SKILL.md`
-4. Sprint report — one command saves `reports/sprint-{YYYY-MM-DD}.md` (`--project` optional when `jira.projectKey` is set):
+4. Sprint report — one command saves `reports/sprint-{DD-MM-YYYY}.md` (`--project` optional when `jira.projectKey` is set):
 
    ```bash
    python scripts/sprint_report.py --issues scripts/.tmp/issues.json \

@@ -1,7 +1,7 @@
 """End-to-end pipeline: issues + config -> schedule, breakdowns, report markdown.
 
-This wires the five-step process and the six report deliverables together so the
-agent runs a single command instead of chaining six scripts.
+This wires the five-step process and the three report sections together so the
+agent runs a single wrapper command.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from sprintkit.bugs import build_bug_effort_breakdown
 from sprintkit.normalize import normalize
 from sprintkit.quality import build_data_quality_by_member, count_dq_reasons
 from sprintkit.render.markdown import (
+    fmt_date,
     jira_issue_link,
     linkify_bare_issue_keys,
     resolve_jira_site_url,
@@ -178,7 +179,7 @@ def standup_summary(
 
     lines = [
         f"Standup — {result.sprint_meta.get('sprintName', 'Active Sprint')} "
-        f"(today {today}, sprint ends {sprint_end})",
+        f"(today {fmt_date(today)}, sprint ends {fmt_date(sprint_end)})",
         "",
         f"Status: on_track {result.status_counts.get('on_track', 0)}, "
         f"at_risk {result.status_counts.get('at_risk', 0)}, "

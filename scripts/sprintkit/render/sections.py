@@ -20,6 +20,8 @@ from sprintkit.render.markdown import (
     epic_prd_anchor,
     epic_title_link,
     escape_md_cell,
+    fmt_date,
+    fmt_date_range,
     fmt_hours,
     fmt_resources,
     format_effort,
@@ -267,15 +269,15 @@ def render_delivery_items(
             m_start, m_end = get_platform_delivery_dates(epic_row, "mobile")
 
             if b_start and b_end:
-                backend_s = f"{b_start} → {b_end}"
+                backend_s = fmt_date_range(b_start, b_end)
             if w_start and w_end:
-                web_s = f"{w_start} → {w_end}"
+                web_s = fmt_date_range(w_start, w_end)
             if m_start and m_end:
-                mobile_s = f"{m_start} → {m_end}"
+                mobile_s = fmt_date_range(m_start, m_end)
 
             go_live = epic_row.get("goLive")
             if go_live:
-                final_release_s = go_live
+                final_release_s = fmt_date(go_live)
 
         lines.append(
             f"| {epic_link} | {title_cell} | {backend_s} | {web_s} | {mobile_s} | {final_release_s} |"
@@ -610,8 +612,8 @@ def render_schedule_delta_section(
         delta.get("newly_scheduled") or [],
         ["Ticket", "Start", "Due", "Status"],
         lambda r: (
-            f"| {jira_issue_link(jira_site_url, r['key'])} | {r.get('startDate', '—')} | "
-            f"{r.get('dueDate', '—')} | {r.get('status', '—')} |"
+            f"| {jira_issue_link(jira_site_url, r['key'])} | {fmt_date(r.get('startDate'))} | "
+            f"{fmt_date(r.get('dueDate'))} | {r.get('status', '—')} |"
         ),
     )
     add_table(
@@ -619,8 +621,8 @@ def render_schedule_delta_section(
         delta.get("newly_unscheduled") or [],
         ["Ticket", "Prior start", "Prior due", "Reason"],
         lambda r: (
-            f"| {jira_issue_link(jira_site_url, r['key'])} | {r.get('priorStart', '—')} | "
-            f"{r.get('priorDue', '—')} | {r.get('reason', '—')} |"
+            f"| {jira_issue_link(jira_site_url, r['key'])} | {fmt_date(r.get('priorStart'))} | "
+            f"{fmt_date(r.get('priorDue'))} | {r.get('reason', '—')} |"
         ),
     )
     add_table(
@@ -628,8 +630,8 @@ def render_schedule_delta_section(
         delta.get("date_changes") or [],
         ["Ticket", "Prior start", "Prior due", "New start", "New due"],
         lambda r: (
-            f"| {jira_issue_link(jira_site_url, r['key'])} | {r.get('priorStart', '—')} | "
-            f"{r.get('priorDue', '—')} | {r.get('startDate', '—')} | {r.get('dueDate', '—')} |"
+            f"| {jira_issue_link(jira_site_url, r['key'])} | {fmt_date(r.get('priorStart'))} | "
+            f"{fmt_date(r.get('priorDue'))} | {fmt_date(r.get('startDate'))} | {fmt_date(r.get('dueDate'))} |"
         ),
     )
     add_table(
