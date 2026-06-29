@@ -159,6 +159,8 @@ timeline:
   effortBuffers:
     bugFixesPercentOfDevelopment: 0.10
     stageFinalTestingPercentOfStageTesting: 0.10
+    backendVerificationPercentOfFeDevelopment: 0.15
+    backendVerificationMaxDays: 2
   executionStages:
     backend:
       - Tech Solutioning

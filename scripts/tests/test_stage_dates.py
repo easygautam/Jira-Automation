@@ -9,7 +9,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from sprintkit.stage_dates import compute_stage_dates  # noqa: E402
+from sprintkit.stage_dates import (  # noqa: E402
+    backend_verification_required_days,
+    compute_stage_dates,
+    signed_business_day_gap,
+)
 from sprintkit.stages import (  # noqa: E402
     STAGE_DEVELOPMENT,
     STAGE_GO_LIVE,
@@ -47,6 +51,13 @@ def _epic(key: str = "E1") -> dict:
 CONFIG = {
     "fields": {"startDate": "customfield_10015"},
     "scheduling": {"workingDayInts": [0, 1, 2, 3, 4]},
+    "timeline": {
+        "hoursPerDay": 6,
+        "effortBuffers": {
+            "backendVerificationPercentOfFeDevelopment": 0.15,
+            "backendVerificationMaxDays": 2,
+        },
+    },
 }
 
 
@@ -343,6 +354,146 @@ class TestComputeStageDates(unittest.TestCase):
         compute_stage_dates(epic_row, issues, CONFIG)
         dev = epic_row["executionStages"]["mobile"]["stages"][0]
         self.assertEqual(dev["start"], "2026-06-05")
+
+
+class TestBackendVerificationBuffer(unittest.TestCase):
+    WORKING = {0, 1, 2, 3, 4}
+    BUFFERS = {
+        "backendVerificationPercentOfFeDevelopment": 0.15,
+        "backendVerificationMaxDays": 2,
+    }
+
+    def test_required_days_capped_at_two_calendar_days(self):
+        row = {"effortsHours": 114.0, "resources": 3.0}
+        self.assertEqual(
+            backend_verification_required_days(row, self.BUFFERS, 6.0),
+            2.0,
+        )
+
+    def test_required_days_from_fe_development_hours(self):
+        row = {"effortsHours": 60.0, "resources": 1.0}
+        self.assertEqual(
+            backend_verification_required_days(row, self.BUFFERS, 6.0),
+            1.5,
+        )
+
+    def test_signed_gap_positive_when_fe_ends_after_be(self):
+        from datetime import date
+
+        gap = signed_business_day_gap(
+            date(2026, 7, 2), date(2026, 7, 3), self.WORKING
+        )
+        self.assertEqual(gap, 1.0)
+
+    def test_partial_buffer_when_fe_ends_one_day_after_be(self):
+        issues = [
+            _issue("BE-D", "BE || API", start_date="2026-06-02"),
+            _issue("WEB-D", "WEB || UI", start_date="2026-06-03"),
+        ]
+        epic_row = {
+            "executionStages": {
+                "backend": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["BE-D"], efforts_hours=12)]
+                ),
+                "frontend": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["WEB-D"], efforts_hours=60)]
+                ),
+                "mobile": _platform_block([], has_work=False),
+            },
+        }
+        compute_stage_dates(epic_row, issues, CONFIG)
+        web = epic_row["executionStages"]["frontend"]["stages"][0]
+        self.assertEqual(web["start"], "2026-06-03")
+        self.assertEqual(web["end"], "2026-06-05")
+        self.assertAlmostEqual(web["backendVerificationBufferDays"], 0.5, places=2)
+        self.assertEqual(web["backendVerificationRequiredDays"], 1.5)
+
+    def test_full_buffer_when_fe_and_be_end_same_day(self):
+        issues = [
+            _issue("BE-D", "BE || API", start_date="2026-06-02"),
+            _issue("WEB-D", "WEB || UI", start_date="2026-06-02"),
+        ]
+        epic_row = {
+            "executionStages": {
+                "backend": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["BE-D"], efforts_hours=12)]
+                ),
+                "frontend": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["WEB-D"], efforts_hours=60)]
+                ),
+                "mobile": _platform_block([], has_work=False),
+            },
+        }
+        compute_stage_dates(epic_row, issues, CONFIG)
+        web = epic_row["executionStages"]["frontend"]["stages"][0]
+        self.assertEqual(web["end"], "2026-06-05")
+        self.assertEqual(web["backendVerificationBufferDays"], 1.5)
+
+    def test_buffer_when_fe_ends_before_be(self):
+        issues = [
+            _issue("BE-D", "BE || API", start_date="2026-06-02"),
+            _issue("WEB-D", "WEB || UI", start_date="2026-06-02"),
+        ]
+        epic_row = {
+            "executionStages": {
+                "backend": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 4, ["BE-D"], efforts_hours=24)]
+                ),
+                "frontend": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["WEB-D"], efforts_hours=60)]
+                ),
+                "mobile": _platform_block([], has_work=False),
+            },
+        }
+        compute_stage_dates(epic_row, issues, CONFIG)
+        be = epic_row["executionStages"]["backend"]["stages"][0]
+        web = epic_row["executionStages"]["frontend"]["stages"][0]
+        self.assertEqual(be["end"], "2026-06-05")
+        self.assertEqual(web["end"], "2026-06-09")
+        self.assertEqual(web["backendVerificationBufferDays"], 3.5)
+
+    def test_no_buffer_without_backend_development(self):
+        issues = [_issue("WEB-D", "WEB || UI", start_date="2026-06-02")]
+        epic_row = {
+            "executionStages": {
+                "backend": _platform_block([], has_work=False),
+                "frontend": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["WEB-D"], efforts_hours=60)]
+                ),
+                "mobile": _platform_block([], has_work=False),
+            },
+        }
+        compute_stage_dates(epic_row, issues, CONFIG)
+        web = epic_row["executionStages"]["frontend"]["stages"][0]
+        self.assertEqual(web["end"], "2026-06-03")
+        self.assertNotIn("backendVerificationBufferDays", web)
+
+    def test_downstream_stage_chains_from_buffered_development_end(self):
+        from sprintkit.stages import STAGE_STAGE_TESTING
+
+        issues = [
+            _issue("BE-D", "BE || API", start_date="2026-06-02"),
+            _issue("WEB-D", "WEB || UI", start_date="2026-06-02"),
+            _issue("WEB-QA", "QA | Web | Testing", start_date="2026-06-10"),
+        ]
+        epic_row = {
+            "executionStages": {
+                "backend": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["BE-D"], efforts_hours=12)]
+                ),
+                "frontend": _platform_block(
+                    [
+                        _stage_row(STAGE_DEVELOPMENT, 2, ["WEB-D"], efforts_hours=60),
+                        _stage_row(STAGE_STAGE_TESTING, 1, ["WEB-QA"], efforts_hours=6),
+                    ]
+                ),
+                "mobile": _platform_block([], has_work=False),
+            },
+        }
+        compute_stage_dates(epic_row, issues, CONFIG)
+        web_stages = epic_row["executionStages"]["frontend"]["stages"]
+        self.assertEqual(web_stages[0]["end"], "2026-06-05")
+        self.assertEqual(web_stages[1]["start"], "2026-06-10")
 
 
 if __name__ == "__main__":

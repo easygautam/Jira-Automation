@@ -14,6 +14,7 @@ Do not recalculate dates in prose; run the pipeline (`scripts/sprint_report.py`;
 | Duration | `ceil(estimateSeconds / (hoursPerDay * 3600))`, min 1 if estimate > 0 |
 | Priority sort | Epic priority → story rank → created date |
 | Task priority | Inherit from parent Epic |
+| BE → Web/Mobile verification | After BE Development ends: if `remainingDays < requiredDays`, extend Web/Mobile Development end by `requiredDays - remainingDays`. `requiredDays = min(15% × FE dev hours, 2 days × 6h) ÷ 6h` (calendar days, not split by dev resources); `remainingDays` = signed business days from BE end to FE end. Jira start dates unchanged. |
 
 Effort source: sum `timeoriginalestimate` on Tasks/Sub-tasks per Story, assignee-wise. **Bug** issues use `timespent` when Original Estimate is empty (see `effective_estimate_seconds` in `scripts/sprintkit/jira_model.py`).
 

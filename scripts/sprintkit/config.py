@@ -116,6 +116,8 @@ def default_config() -> dict[str, Any]:
             "effortBuffers": {
                 "bugFixesPercentOfDevelopment": 0.10,
                 "stageFinalTestingPercentOfStageTesting": 0.10,
+                "backendVerificationPercentOfFeDevelopment": 0.15,
+                "backendVerificationMaxDays": 2,
             },
             "executionStages": {
                 platform: list(stages)

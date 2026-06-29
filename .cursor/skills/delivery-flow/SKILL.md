@@ -40,22 +40,20 @@ All teams (Backend, Mobile, Web, QA) understand the requirement and do tech solu
 | Dependency | Scheduling rule |
 |------------|-----------------|
 | Backend provides API contracts | Mobile and Web use contracts during development |
-| Backend delivers APIs | Mobile/Web start after BE due date (schedule engine) |
+| Backend delivers APIs | Web/Mobile Development end may extend for post-BE verification buffer (see below) |
 | Backend provides API contracts | QA writes automation |
 | Backend delivers APIs | QA validates API once backend delivers |
 
+**Web/Mobile backend verification buffer** (`scripts/sprintkit/stage_dates.py`, config `timeline.effortBuffers`):
+
+- `requiredDays = min(15% × Web/Mobile Development hours, 2 calendar days × hoursPerDay) ÷ hoursPerDay` (platform calendar time, not divided by dev resources)
+- `remainingDays` = signed business-day gap from Backend Development end to Web/Mobile Development end
+- If `remainingDays < requiredDays`, extend Web/Mobile Development end by `requiredDays - remainingDays` (downstream stages re-chain)
+- Jira **start** dates are not gated on Backend completion
+
 Engine implementation (`scripts/sprintkit/schedule.py`):
 
-- Items with `team` = mobile or frontend: `start ≥` linked BE story/item due date for same epic
-- Items with `team` = qa and dependency type API validation: start ≥ BE due date for same epic
-
-Pass dependencies in normalized JSON as:
-
-```json
-{ "type": "backend_delivery", "dependsOnKey": "PROJ-50", "epicKey": "PROJ-1" }
-```
-
-If the dependency task is not scheduled (e.g. missing estimate), the engine does **not** flag a violation and does not delay the dependent task.
+- Per-task sprint schedule does not auto-inject backend dependencies; platform stage timelines carry the verification buffer
 
 ## Phase snapshot (for reports)
 
@@ -91,7 +89,7 @@ Computed in `scripts/sprintkit/stage_dates.py` after timeline effort aggregation
 | Stage | Start | End |
 |-------|-------|-----|
 | Tech Solutioning | Earliest Jira **Start date** among stage tasks **and Task/Story parents** (not Epic); none → `—` | `add_business_days(start, max days)` (6h person-days) |
-| Development | Earliest Jira Start among dev tasks + Task/Story parents; Web/Mobile ≥ next workday after BE Development end | same |
+| Development | Earliest Jira Start among dev tasks + Task/Story parents; end may extend for backend verification buffer (see Dependencies) | same |
 | Other stages | `next_workday(prior_stage_end)` when stage has tasks or effort; **no tasks and no effort → `—`** | same |
 
 **Stage max days** = max person-days across assignees on that stage (`max(effort ÷ 6h)` per member). Synthetic effort-only stages use aggregate `(efforts + leave) ÷ (resources × 6h)`.
