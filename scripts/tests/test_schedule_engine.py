@@ -146,43 +146,8 @@ class TestMissingEstimate(unittest.TestCase):
         self.assertEqual(result["unscheduled"][0]["reason"], "missing_estimate")
 
 
-class TestBackendDependency(unittest.TestCase):
-    def test_mobile_starts_after_backend(self):
-        data = {
-            "sprintStart": "2026-06-02",
-            "sprintEnd": "2026-06-20",
-            "hoursPerDay": 8,
-            "workingDays": [0, 1, 2, 3, 4],
-            "today": "2026-06-02",
-            "items": [
-                {
-                    "key": "BE-1",
-                    "assignee": "be_dev",
-                    "estimateSeconds": 16 * 3600,
-                    "epicPriorityRank": 1,
-                    "storyRank": 1,
-                    "team": "backend",
-                    "created": "2026-06-01",
-                    "dependencies": [],
-                },
-                {
-                    "key": "MOB-1",
-                    "assignee": "mob_dev",
-                    "estimateSeconds": 8 * 3600,
-                    "epicPriorityRank": 1,
-                    "storyRank": 2,
-                    "team": "mobile",
-                    "created": "2026-06-01",
-                    "dependencies": [{"type": "backend_delivery", "dependsOnKey": "BE-1"}],
-                },
-            ],
-        }
-        result = compute_schedule(data)
-        be = next(x for x in result["scheduled"] if x["key"] == "BE-1")
-        mob = next(x for x in result["scheduled"] if x["key"] == "MOB-1")
-        self.assertGreaterEqual(parse_date(mob["startDate"]), parse_date(be["dueDate"]))
-
-    def test_unscheduled_dependency_no_violation(self):
+class TestExplicitDependencies(unittest.TestCase):
+    def test_optional_dependency_does_not_delay_when_unscheduled(self):
         data = {
             "sprintStart": "2026-06-02",
             "sprintEnd": "2026-06-20",
@@ -207,6 +172,52 @@ class TestBackendDependency(unittest.TestCase):
         result = compute_schedule(data)
         self.assertEqual(result["violations"], [])
         self.assertEqual(len(result["scheduled"]), 1)
+
+    def test_mobile_and_web_start_at_sprint_without_be_gate(self):
+        data = {
+            "sprintStart": "2026-06-02",
+            "sprintEnd": "2026-06-20",
+            "hoursPerDay": 8,
+            "workingDays": [0, 1, 2, 3, 4],
+            "today": "2026-06-02",
+            "items": [
+                {
+                    "key": "BE-1",
+                    "assignee": "be_dev",
+                    "estimateSeconds": 16 * 3600,
+                    "epicPriorityRank": 1,
+                    "storyRank": 1,
+                    "team": "backend",
+                    "created": "2026-06-01",
+                    "dependencies": [],
+                },
+                {
+                    "key": "WEB-1",
+                    "assignee": "web_dev",
+                    "estimateSeconds": 8 * 3600,
+                    "epicPriorityRank": 1,
+                    "storyRank": 2,
+                    "team": "frontend",
+                    "created": "2026-06-01",
+                    "dependencies": [],
+                },
+                {
+                    "key": "MOB-1",
+                    "assignee": "mob_dev",
+                    "estimateSeconds": 8 * 3600,
+                    "epicPriorityRank": 1,
+                    "storyRank": 3,
+                    "team": "mobile",
+                    "created": "2026-06-01",
+                    "dependencies": [],
+                },
+            ],
+        }
+        result = compute_schedule(data)
+        web = next(x for x in result["scheduled"] if x["key"] == "WEB-1")
+        mob = next(x for x in result["scheduled"] if x["key"] == "MOB-1")
+        self.assertEqual(web["startDate"], "2026-06-02")
+        self.assertEqual(mob["startDate"], "2026-06-02")
 
 
 if __name__ == "__main__":

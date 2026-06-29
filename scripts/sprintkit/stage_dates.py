@@ -138,12 +138,10 @@ def compute_stage_dates(
     timeline_cfg = config.get("timeline") or {}
     hours_per_day = float(timeline_cfg.get("hoursPerDay", 6))
 
-    be_dev_end: date | None = None
     all_starts: list[date] = []
     all_ends: list[date] = []
     go_live: date | None = None
 
-    # Backend first so BE Development end is available for Web/Mobile constraints.
     for platform in PLATFORM_KEYS:
         block = exec_stages.get(platform) or {}
         stages = block.get("stages") or []
@@ -167,10 +165,6 @@ def compute_stage_dates(
                 start = _min_jira_start(issue_keys, index, config)
             elif stage_name == STAGE_DEVELOPMENT:
                 start = _min_jira_start(issue_keys, index, config)
-                if platform in ("frontend", "mobile") and be_dev_end is not None:
-                    dep_start = next_working_day(be_dev_end, working_days)
-                    if start is not None:
-                        start = max(start, dep_start)
             else:
                 if prior_end is not None:
                     start = _chain_start(prior_end, prior_calc_days, working_days)
@@ -188,9 +182,6 @@ def compute_stage_dates(
                 all_ends.append(end)
             if stage_name == STAGE_GO_LIVE and end:
                 go_live = end
-
-            if stage_name == STAGE_DEVELOPMENT and platform == "backend" and end:
-                be_dev_end = end
 
             prior_end = end if end else prior_end
             prior_calc_days = calc_days if calc_days is not None else prior_calc_days

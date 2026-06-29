@@ -128,7 +128,7 @@ class TestComputeStageDates(unittest.TestCase):
         self.assertIsNone(stages[1]["start"])
         self.assertIsNone(epic_row["deliveryStart"])
 
-    def test_web_dev_respects_be_end(self):
+    def test_web_dev_uses_jira_start_not_be_end(self):
         issues = [
             _issue("BE-D", "BE || API", start_date="2026-06-02"),
             _issue("WEB-D", "WEB || UI", start_date="2026-06-03"),
@@ -145,10 +145,35 @@ class TestComputeStageDates(unittest.TestCase):
             },
         }
         compute_stage_dates(epic_row, issues, CONFIG)
-        be_end = epic_row["executionStages"]["backend"]["stages"][0]["end"]
         web_start = epic_row["executionStages"]["frontend"]["stages"][0]["start"]
-        self.assertEqual(be_end, "2026-06-03")
-        self.assertEqual(web_start, "2026-06-04")
+        self.assertEqual(web_start, "2026-06-03")
+
+    def test_mobile_dev_not_delayed_by_be_end(self):
+        issues = [
+            _issue("BE-D", "BE || API", start_date="2026-06-02"),
+            _issue("APP-PARENT", "App | Development", start_date="2026-06-17"),
+            _issue(
+                "ST1",
+                "sub work",
+                parent_key="APP-PARENT",
+                parent_type="Task",
+                issuetype="Sub-task",
+            ),
+        ]
+        epic_row = {
+            "executionStages": {
+                "backend": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 10, ["BE-D"])]
+                ),
+                "frontend": _platform_block([], has_work=False),
+                "mobile": _platform_block(
+                    [_stage_row(STAGE_DEVELOPMENT, 2, ["ST1"], efforts_hours=12)]
+                ),
+            },
+        }
+        compute_stage_dates(epic_row, issues, CONFIG)
+        mobile_start = epic_row["executionStages"]["mobile"]["stages"][0]["start"]
+        self.assertEqual(mobile_start, "2026-06-17")
 
     def test_empty_stage_has_no_dates_chain_skips_it(self):
         issues = [_issue("E1-AS", "BE | Assessment", start_date="2026-06-02")]

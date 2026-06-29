@@ -19,30 +19,7 @@ from sprintkit.jira_model import (
     resolve_story,
     task_has_subtasks,
 )
-from sprintkit.teams import delivery_platform, team_from_issue
-
-
-def find_backend_dependency(
-    epic_key: str | None,
-    index: dict[str, dict[str, Any]],
-    teams_cfg: dict[str, list[str]],
-    self_key: str,
-    config: dict[str, Any] | None = None,
-) -> str | None:
-    if not epic_key:
-        return None
-    for key, issue in index.items():
-        if key == self_key:
-            continue
-        epic = resolve_epic(issue, index)
-        if not epic or epic.get("key") != epic_key:
-            continue
-        if delivery_platform(team_from_issue(issue, teams_cfg, config), config) != "backend":
-            continue
-        t = issue_type_name(issue)
-        if t in ("task", "sub-task", "subtask"):
-            return key
-    return None
+from sprintkit.teams import team_from_issue
 
 
 def normalize(
@@ -84,20 +61,6 @@ def normalize(
             epic_priority = (get_field(epic, "priority") or {}).get("name")
 
         team = team_from_issue(issue, teams_cfg, config)
-        dependencies: list[dict[str, Any]] = []
-        plat = delivery_platform(team, config)
-        if plat in ("mobile", "frontend") or team == "qa":
-            be_key = find_backend_dependency(
-                epic_key, index, teams_cfg, issue.get("key", ""), config
-            )
-            if be_key:
-                dependencies.append(
-                    {
-                        "type": "backend_delivery",
-                        "dependsOnKey": be_key,
-                        "epicKey": epic_key,
-                    }
-                )
 
         items.append(
             {
@@ -111,7 +74,7 @@ def normalize(
                 "team": team,
                 "created": get_field(issue, "created") or "",
                 "blocked": is_blocked(issue),
-                "dependencies": dependencies,
+                "dependencies": [],
             }
         )
 
