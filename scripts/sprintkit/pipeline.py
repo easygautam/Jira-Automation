@@ -23,6 +23,7 @@ from sprintkit.render.report import render_report
 from sprintkit.schedule import compute_schedule
 from sprintkit.sprint_window import extract_active_sprint
 from sprintkit.config import config_warnings
+from sprintkit.jira_model import filter_allowed_issues
 from sprintkit.timeline import build_timeline_breakdown, check_timeline_team_consistency
 
 
@@ -85,6 +86,7 @@ def run_pipeline(
     prior_schedule: dict[str, Any] | None = None,
 ) -> PipelineResult:
     """Run window -> normalize -> schedule -> timeline -> bugs -> render."""
+    issues = filter_allowed_issues(issues, config)
     sprint_meta = resolve_sprint_meta(
         issues,
         config,

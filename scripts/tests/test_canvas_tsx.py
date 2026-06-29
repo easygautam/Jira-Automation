@@ -45,6 +45,11 @@ class TestCanvasTsx(unittest.TestCase):
         self.assertIn("VP-800", content)
         path.unlink(missing_ok=True)
 
+    def test_stage_delivery_table_uses_max_days_label(self):
+        text = render_epic_canvas_tsx(self.result.canvas_data)
+        self.assertIn('"Max days"', text)
+        self.assertIn('"Calc days", "Mapped tasks"', text)
+
     def test_additional_efforts_section_when_present(self):
         canvas = dict(self.result.canvas_data)
         canvas["additionalEfforts"] = [

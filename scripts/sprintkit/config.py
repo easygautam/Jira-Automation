@@ -14,7 +14,17 @@ except ImportError:  # pragma: no cover - optional dependency
 DEFAULT_PRIORITY = ["Highest", "High", "Medium", "Low", "Lowest"]
 DEFAULT_BUG_ACTIVE_STATUSES = ["To Do", "In Progress", "Hold", "Deferred"]
 DEFAULT_BUG_NO_WORKLOG_STATUSES = ["Not a Bug"]
-SCHEDULABLE_TYPES = frozenset({"task", "sub-task", "subtask", "bug", "test execution"})
+DEFAULT_ALLOWED_ISSUE_TYPES = frozenset(
+    {"epic", "story", "task", "sub-task", "subtask", "bug"}
+)
+DEFAULT_ALLOWED_ISSUE_TYPE_LABELS = (
+    "Epic",
+    "Story",
+    "Task",
+    "Sub-task",
+    "Bug",
+)
+SCHEDULABLE_TYPES = frozenset({"task", "sub-task", "subtask", "bug"})
 
 DEFAULT_SIDE_DISPLAY: dict[str, str] = {
     "backend": "Backend",
@@ -65,6 +75,27 @@ _pyyaml_warning_emitted = False
 
 def pyyaml_available() -> bool:
     return yaml is not None
+
+
+def _normalize_issue_type_name(name: str) -> str:
+    return name.strip().lower()
+
+
+def allowed_issue_types(config: dict[str, Any] | None) -> frozenset[str]:
+    """Lowercase set of Jira issue types kept by fetch and pipeline filters."""
+    jira = (config or {}).get("jira") or {}
+    raw = jira.get("allowedIssueTypes")
+    if not raw:
+        return DEFAULT_ALLOWED_ISSUE_TYPES
+    return frozenset(_normalize_issue_type_name(str(t)) for t in raw)
+
+
+def jql_allowed_issue_types_clause(config: dict[str, Any] | None) -> str:
+    """JQL fragment: issuetype in (Epic, Story, Task, Sub-task, Bug)."""
+    jira = (config or {}).get("jira") or {}
+    labels = jira.get("allowedIssueTypes") or list(DEFAULT_ALLOWED_ISSUE_TYPE_LABELS)
+    quoted = ", ".join(str(label) for label in labels)
+    return f"issuetype in ({quoted})"
 
 
 def resolve_side_display_map(config: dict[str, Any] | None) -> dict[str, str]:

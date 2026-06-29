@@ -10,7 +10,7 @@ Read-only MCP fetch. Requires **Epic key** from the user (project derived from k
 
 ## Three-pass fetch
 
-Substitute `{epicKey}` only (no project filter).
+Substitute `{epicKey}` only (no project filter). JQL templates in config already include the issue-type allowlist (`issuetype in (Epic, Story, Task, Sub-task, Bug)`). Do not fetch Test Execution or other QA-only types.
 
 | Pass | JQL template (config key) |
 |------|---------------------------|

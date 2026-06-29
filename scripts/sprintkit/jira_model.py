@@ -9,6 +9,7 @@ from sprintkit.config import (
     DEFAULT_BUG_ACTIVE_STATUSES,
     DEFAULT_BUG_NO_WORKLOG_STATUSES,
     DEFAULT_PRIORITY,
+    allowed_issue_types,
 )
 
 
@@ -71,6 +72,21 @@ def is_bug_issue(issue: dict[str, Any]) -> bool:
     return issue_type_name(issue) == "bug"
 
 
+def is_allowed_issue_type(
+    issue: dict[str, Any], config: dict[str, Any] | None = None
+) -> bool:
+    """True when issue type is in jira.allowedIssueTypes (fetch/report allowlist)."""
+    return issue_type_name(issue) in allowed_issue_types(config)
+
+
+def filter_allowed_issues(
+    issues: list[dict[str, Any]], config: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
+    """Drop issues whose type is outside the EM workflow allowlist."""
+    allowed = allowed_issue_types(config)
+    return [issue for issue in issues if issue_type_name(issue) in allowed]
+
+
 def assignee_id(issue: dict[str, Any]) -> str:
     a = get_field(issue, "assignee")
     if not a:
@@ -126,7 +142,7 @@ def effective_estimate_seconds(
     issue: dict[str, Any], config: dict[str, Any] | None = None
 ) -> int:
     """
-    Task/Sub-task/Test Execution: Original Estimate only.
+    Task/Sub-task: Original Estimate only.
     Bug: time spent (worklog total) if > 0, else Original Estimate.
     """
     oe = estimate_seconds(issue, config)

@@ -320,7 +320,7 @@ export default function EpicEstimationCanvas() {
                 "Resources",
                 "Effort (h)",
                 "Leave (h)",
-                "Calc days",
+                "Max days",
                 "Start",
                 "End",
               ]}

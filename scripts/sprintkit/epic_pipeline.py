@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from sprintkit.config import config_warnings
-from sprintkit.jira_model import epic_summary, filter_issues_for_epic, is_epic_issue
+from sprintkit.jira_model import epic_summary, filter_allowed_issues, filter_issues_for_epic, is_epic_issue
 from sprintkit.quality import build_data_quality_by_member, count_dq_reasons
 from sprintkit.render.epic_sections import build_epic_display_payload
 from sprintkit.render.markdown import resolve_jira_site_url
@@ -36,6 +36,7 @@ def run_epic_estimation(
     jira_site_url: str | None = None,
 ) -> EpicEstimationResult:
     """Run effort mapping and stage date calculation for one epic."""
+    issues = filter_allowed_issues(issues, config)
     epic_issues = filter_issues_for_epic(issues, epic_key)
     if not epic_issues:
         raise ValueError(f"No issues found for epic {epic_key}")

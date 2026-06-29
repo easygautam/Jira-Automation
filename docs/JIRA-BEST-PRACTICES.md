@@ -29,6 +29,8 @@ How to structure issues, titles, estimates, and dates in Jira during a sprint. F
 | **Task / Sub-task** | Build, QA, leave, and other execution work |
 | **Bug** | Defects only |
 
+**Test Execution** is for QA execution tracking in Jira only — not fetched or used in EM sprint/epic reports.
+
 Do not log features or enhancements as **Bug**. Use **Task** or **Sub-task**.
 
 ---

@@ -10,7 +10,15 @@ jira:
   siteUrl: https://physicswallah001.atlassian.net   # Base URL for clickable issue links
   projectKey: "VP"             # Default project for sprint-report JQL (override via --project)
   boardId: 189                  # Optional; for board-scoped queries
-  activeSprintJql: 'project = {projectKey} AND sprint in openSprints()'
+  allowedIssueTypes:
+    - Epic
+    - Story
+    - Task
+    - Sub-task
+    - Bug
+  activeSprintJql: >-
+    project = {projectKey} AND sprint in openSprints()
+    AND issuetype in (Epic, Story, Task, Sub-task, Bug)
   sprintDiscovery:
     autoDiscover: true           # use getJiraIssueTypeMetaWithFields if sprint field empty
 
@@ -23,9 +31,15 @@ fields:
   teams: customfield_10218       # Jira Teams select field (secondary team source)
 
 epicEstimation:
-  epicScopeJql: 'key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey}'
-  taskScopeJql: 'parent in ({parentKeys})'
-  subtaskScopeJql: 'parent in ({taskKeys})'
+  epicScopeJql: >-
+    (key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey})
+    AND issuetype in (Epic, Story, Task, Sub-task, Bug)
+  taskScopeJql: >-
+    parent in ({parentKeys})
+    AND issuetype in (Epic, Story, Task, Sub-task, Bug)
+  subtaskScopeJql: >-
+    parent in ({taskKeys})
+    AND issuetype in (Epic, Story, Task, Sub-task, Bug)
 
 scheduling:
   hoursPerDay: 8

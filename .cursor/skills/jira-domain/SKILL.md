@@ -26,10 +26,30 @@ Epic (priority source) → Story → Task / Sub-task (estimate + assignee). Walk
 
 Task effective priority = Epic priority (`priorityOrder` in config). Flag missing estimates before scheduling.
 
+## Allowed issue types (MCP fetch + reports)
+
+Only these Jira types are fetched and processed (`jira.allowedIssueTypes` in config):
+
+| Type | Role in EM workflow |
+|------|---------------------|
+| Epic | Delivery item (PRD) |
+| Story | Releasable slice / hierarchy |
+| Task | Execution + estimates |
+| Sub-task | Execution + estimates |
+| Bug | Defect effort + quality report |
+
+**Out of scope:** Test Execution, Test Plan, and any other issuetype. QA uses Test Execution for execution tracking only; the EM pipeline ignores it.
+
+JQL allowlist fragment (all fetch queries):
+
+```jql
+issuetype in (Epic, Story, Task, Sub-task, Bug)
+```
+
 ## JQL — sprint report (substitute `{projectKey}`)
 
 ```jql
-project = {projectKey} AND sprint in openSprints()
+project = {projectKey} AND sprint in openSprints() AND issuetype in (Epic, Story, Task, Sub-task, Bug)
 project = {projectKey} AND issuetype = Epic AND sprint in openSprints()
 parent = STORY-KEY
 project = {projectKey} AND sprint in openSprints() AND timeoriginalestimate is EMPTY AND assignee is not EMPTY AND issuetype in (Task, Sub-task)
@@ -39,17 +59,20 @@ Resolve `{projectKey}` from user-stated project → CLI `--project` → `jira.pr
 
 ## Epic scope JQL (`/epic-estimation`, substitute `{epicKey}` only)
 
-Two-pass fetch (no sprint filter; no project filter — issue keys are site-wide unique):
+Three-pass fetch (no sprint filter; no project filter — issue keys are site-wide unique). Each pass includes the issuetype allowlist.
 
 ```jql
 # Pass 1 — epicEstimation.epicScopeJql
-key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey}
+(key = {epicKey} OR "Epic Link" = {epicKey} OR parent = {epicKey})
+AND issuetype in (Epic, Story, Task, Sub-task, Bug)
 
 # Pass 2 — epicEstimation.taskScopeJql ({parentKeys} = story keys from pass 1)
 parent in ({parentKeys})
+AND issuetype in (Epic, Story, Task, Sub-task, Bug)
 
 # Pass 3 — epicEstimation.subtaskScopeJql ({taskKeys} = Task keys from pass 1 + pass 2)
 parent in ({taskKeys})
+AND issuetype in (Epic, Story, Task, Sub-task, Bug)
 ```
 
 Write merged issues to `scripts/.tmp/epic-{epicKey}-issues.json`. Include `fields.startDate` (`customfield_10015` by default), `duedate`, and `fields.teams` in MCP field list.
