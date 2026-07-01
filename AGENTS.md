@@ -20,6 +20,9 @@ python scripts/sprint_report.py --issues scripts/tests/fixtures/mini_issues.json
 
 python scripts/run_epic_estimation.py --epic VP-800 \
   --issues scripts/tests/fixtures/epic_cli_issues.json
+
+python scripts/run_epic_setup.py --epic PPL-1546 \
+  --issues scripts/tests/fixtures/epic_setup_empty.json
 ```
 
 Live runs: agent MCP fetch → wrapper scripts (`run_sprint_report.py`, `run_epic_estimation.py`, `run_epic_estimation_slack.py`). See `.cursor/WORKFLOW.md`.

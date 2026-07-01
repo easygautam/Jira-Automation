@@ -1,0 +1,121 @@
+[
+  {
+    "key": "PPL-1546",
+    "fields": {
+      "summary": "Push Notifications",
+      "issuetype": { "name": "Epic", "hierarchyLevel": 1 },
+      "fixVersions": [{ "id": "22390", "name": "PRD" }],
+      "customfield_10314": { "id": "10423", "value": "PRD - Feature" },
+      "customfield_10020": [{ "id": 12994, "name": "Pi Lens SP2", "state": "active" }],
+      "priority": { "name": "Medium" }
+    }
+  },
+  {
+    "key": "PPL-1547",
+    "fields": {
+      "summary": "BE | Assessment | Push Notifications",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1548",
+    "fields": {
+      "summary": "QA | BE | Assessment | Push Notifications",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1549",
+    "fields": {
+      "summary": "BE | Push Notifications — backend delivery",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1550",
+    "fields": {
+      "summary": "QA | BE | Push Notifications — stage testing",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1551",
+    "fields": {
+      "summary": "BE | Prod release | Push Notifications",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1552",
+    "fields": {
+      "summary": "BE | Prod final testing | Push Notifications",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1553",
+    "fields": {
+      "summary": "APP | Assessment | Push Notifications",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1554",
+    "fields": {
+      "summary": "QA | APP | Assessment | Push Notifications",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1555",
+    "fields": {
+      "summary": "APP | Push Notifications — mobile delivery",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1556",
+    "fields": {
+      "summary": "QA | APP | Push Notifications — stage testing",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1558",
+    "fields": {
+      "summary": "QA | APP | Pre-Prod | Push Notifications — E2E testing",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  },
+  {
+    "key": "PPL-1557",
+    "fields": {
+      "summary": "APP | UAT | Push Notifications — product sign-off",
+      "issuetype": { "name": "Task" },
+      "parent": { "key": "PPL-1546" },
+      "customfield_10014": "PPL-1546"
+    }
+  }
+]

@@ -11,6 +11,7 @@
 | `/sprint-report --standup` | sprint-analyst | sprint-report | `run_sprint_report.py --standup` | standup text only |
 | `/epic-estimation` | sprint-analyst | epic-estimation | `python scripts/run_epic_estimation.py --epic {KEY}` | canvas `.tsx` + summary |
 | `/epic-estimation-send-slack` | sprint-analyst | epic-estimation-send-slack | `python scripts/run_epic_estimation_slack.py --epic {KEY}` | canvas + Slack + summary |
+| `/epic-setup` | sprint-analyst | epic-setup | `python scripts/run_epic_setup.py --epic {KEY}` | stage task plan (+ MCP create on `--create`) |
 | `/improve-workflow` | sprint-analyst | improve-workflow | (meta — no wrapper) | Improvement Report |
 
 **Agent per run:** MCP FETCH (`_shared/jira-fetch-*.md`) → one wrapper script → paste (`_shared/post-run.md`).
@@ -45,6 +46,7 @@ Scheduling (`normalize.py` + `schedule.py`, 8h/day), bug effort (`bugs.py`), dat
 python scripts/run_sprint_report.py --issues scripts/.tmp/issues.json --config .cursor/config/em-config.yaml
 python scripts/run_epic_estimation.py --epic VP-800 --issues scripts/.tmp/epic-VP-800-issues.json
 python scripts/run_epic_estimation_slack.py --epic VP-800 --issues scripts/.tmp/epic-VP-800-issues.json
+python scripts/run_epic_setup.py --epic PPL-1546 --issues scripts/.tmp/epic-PPL-1546-issues.json
 ```
 
 ### Low-level CLIs
@@ -53,6 +55,7 @@ python scripts/run_epic_estimation_slack.py --epic VP-800 --issues scripts/.tmp/
 python scripts/sprint_report.py --issues scripts/.tmp/issues.json --config .cursor/config/em-config.yaml --summary
 python scripts/epic_estimation.py --epic VP-800 --issues scripts/.tmp/epic-VP-800-issues.json --write-canvas --summary-only
 python scripts/epic_estimation_slack.py --epic VP-800 --issues scripts/.tmp/epic-VP-800-issues.json --write-canvas
+python scripts/epic_setup.py --epic PPL-1546 --issues scripts/.tmp/epic-PPL-1546-issues.json
 ```
 
 Sprint options: `--recalc`, `--prior-schedule`, `--standup`, `--sprint-start/--sprint-end`, `--today`, `--output`.
@@ -90,6 +93,7 @@ Tests: `scripts/tests/` · Fixtures: `scripts/tests/fixtures/`
     ├── sprint-report/
     ├── epic-estimation/
     ├── epic-estimation-send-slack/
+    ├── epic-setup/
     ├── jira-domain/    # reference
     ├── delivery-flow/  # reference
     └── improve-workflow/

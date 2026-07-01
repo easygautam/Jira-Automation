@@ -207,3 +207,39 @@ timeline:
       - UAT
       - Go live date
   # Stage mapping is pipe-segment based in scripts/sprintkit/stages.py (not keyword rules).
+
+epicSetup:
+  defaultPlatforms: [backend, mobile]
+  devPlaceholders: true
+  placeholderEstimate: "1h"
+  taskStages:
+    backend:
+      - Tech Solutioning
+      - QA Test Planning
+      - Development
+      - Stage testing
+      - Prod release
+      - Prod final testing
+    mobile:
+      - Tech Solutioning
+      - QA Test Planning
+      - Development
+      - Stage testing
+      - Pre-Prod testing
+      - UAT
+    frontend:
+      - Tech Solutioning
+      - QA Test Planning
+      - Development
+      - Stage testing
+      - Pre-Prod testing
+      - UAT
+  projectDefaults:
+    PPL:
+      teamsByRole:
+        backend: { id: "10193" }
+        mobile: { id: "10189" }
+        frontend: { id: "10191" }
+        qa: { id: "10265" }
+      projectElement: { id: "10423" }
+      fixVersion: { id: "22390" }

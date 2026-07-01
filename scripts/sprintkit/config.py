@@ -218,6 +218,46 @@ def config_warnings(config: dict[str, Any] | None) -> list[str]:
     return warnings
 
 
+DEFAULT_EPIC_SETUP: dict[str, Any] = {
+    "defaultPlatforms": ["backend", "mobile"],
+    "devPlaceholders": True,
+    "placeholderEstimate": "1h",
+    "taskStages": {
+        "backend": [
+            "Tech Solutioning",
+            "QA Test Planning",
+            "Development",
+            "Stage testing",
+            "Prod release",
+            "Prod final testing",
+        ],
+        "mobile": [
+            "Tech Solutioning",
+            "QA Test Planning",
+            "Development",
+            "Stage testing",
+            "Pre-Prod testing",
+            "UAT",
+        ],
+        "frontend": [
+            "Tech Solutioning",
+            "QA Test Planning",
+            "Development",
+            "Stage testing",
+            "Pre-Prod testing",
+            "UAT",
+        ],
+    },
+    "projectDefaults": {},
+}
+
+
+def load_epic_setup_config(config: dict[str, Any] | None) -> dict[str, Any]:
+    """Merged epicSetup block from em-config.yaml over built-in defaults."""
+    raw = (config or {}).get("epicSetup") or {}
+    return _deep_merge(dict(DEFAULT_EPIC_SETUP), raw)
+
+
 def load_config(path: Path) -> dict[str, Any]:
     """Load em-config.yaml merged over built-in defaults."""
     global _pyyaml_warning_emitted

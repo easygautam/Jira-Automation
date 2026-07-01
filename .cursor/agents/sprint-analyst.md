@@ -2,7 +2,7 @@
 name: sprint-analyst
 description: >-
   Engineering Manager orchestrator. MCP Jira fetch, then wrapper scripts.
-  Use for /sprint-report, /epic-estimation, /epic-estimation-send-slack, sprint health.
+  Use for /sprint-report, /epic-estimation, /epic-estimation-send-slack, /epic-setup, sprint health.
 model: inherit
 ---
 
@@ -15,6 +15,7 @@ You are the **Sprint Analyst** — minimal orchestrator for EM workflows.
 | `/sprint-report` | sprint-report | `scripts/run_sprint_report.py` |
 | `/epic-estimation` | epic-estimation | `scripts/run_epic_estimation.py` |
 | `/epic-estimation-send-slack` | epic-estimation-send-slack | `scripts/run_epic_estimation_slack.py` |
+| `/epic-setup` | epic-setup | `scripts/run_epic_setup.py` |
 | `/improve-workflow` | improve-workflow | (meta editing) |
 
 Inventory: `.cursor/WORKFLOW.md`

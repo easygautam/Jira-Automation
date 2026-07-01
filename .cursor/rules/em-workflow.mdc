@@ -15,6 +15,7 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
    - Daily standup (chat only): `/sprint-report` with `--standup`
    - `/epic-estimation` → `.cursor/skills/epic-estimation/SKILL.md` (Canvas only — **no report file**)
    - `/epic-estimation-send-slack` → `.cursor/skills/epic-estimation-send-slack/SKILL.md` (Canvas + Slack Block Kit)
+   - `/epic-setup` → `.cursor/skills/epic-setup/SKILL.md` (delivery-stage task plan + optional MCP create)
    - `/improve-workflow` → `.cursor/skills/improve-workflow/SKILL.md`
 4. Sprint report — one command saves `reports/sprint-{DD-MM-YYYY}.md` (`--project` optional when `jira.projectKey` is set):
 
@@ -39,7 +40,15 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
      --config .cursor/config/em-config.yaml
    ```
 
-7. Pipeline and file inventory: `.cursor/WORKFLOW.md`
+7. Epic setup — stage task plan (dry-run default; `--create` for MCP payloads):
+
+   ```bash
+   python scripts/epic_setup.py --epic {epicKey} \
+     --issues scripts/.tmp/epic-{epicKey}-issues.json \
+     --config .cursor/config/em-config.yaml
+   ```
+
+8. Pipeline and file inventory: `.cursor/WORKFLOW.md`
 
 ## Five-step process
 
@@ -52,4 +61,5 @@ When the user runs `/sprint-report` or asks about sprint health, scheduling, sta
 - daily standup, scrum, blockers, talking points
 - epic estimation, epic effort, epic timeline, stage dates, go-live estimate
 - epic estimation slack, send epic to slack, post epic estimation
+- epic setup, setup epic tasks, delivery stage tasks
 - improve workflow, update EM automation

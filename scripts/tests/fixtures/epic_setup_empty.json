@@ -1,0 +1,13 @@
+[
+  {
+    "key": "PPL-1546",
+    "fields": {
+      "summary": "Push Notifications",
+      "issuetype": { "name": "Epic", "hierarchyLevel": 1 },
+      "fixVersions": [{ "id": "22390", "name": "PRD" }],
+      "customfield_10314": { "id": "10423", "value": "PRD - Feature" },
+      "customfield_10020": [{ "id": 12994, "name": "Pi Lens SP2", "state": "active" }],
+      "priority": { "name": "Medium" }
+    }
+  }
+]
